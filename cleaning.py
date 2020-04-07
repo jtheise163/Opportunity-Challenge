@@ -5,7 +5,7 @@ Created on Fri Mar 27 11:21:12 2020
 @author: hartmann
 """
 
-
+import numpy as np
 import pandas as pd
 import glob
 import matplotlib.pyplot as plt
@@ -39,21 +39,7 @@ class Datencleaner:
         self.label = daten['Column: 244 Locomotion']                     #label spalte 244
         self.daten = pd.concat([self.input, self.label], axis = 1) 
         
-    def explorer(self, sensorplots = False, sensorpdf = False):
-        nan_vals = self.daten.isnull().sum()
-        if sensorplots:
-            k = 0
-            for nfig in range (50):
-                plt.figure(nfig)
-                for nsub in range (5):
-                    plt.subplot(5,1,nsub+1)
-                    for nplot in range(3):
-                        plt.plot(self.daten.iloc[:,k])
-                    k += 1
-        
-        return nan_vals
-        
-    
+
     def handle_missing_values(self):
         '''method to deal with nan values'''
         # interpolates the nan values linearily with the subsequent values 
@@ -62,14 +48,25 @@ class Datencleaner:
         self.input = self.input.fillna(0)
         self.daten = pd.concat([self.input, self.label], axis = 1)
     
+    def nan_vals_check(self):
+        nan_vals = self.daten.isna()
+        check = np.where (nan_vals == True)
+        if check [1] is None:
+            return True
+        else:
+            return False
+    
+    def outliers(self):
+        pass
+        
+    
         
         
 dataobj = Datencleaner(roh_daten)
-nan_vals = dataobj.explorer(sensorplots = False)
 dataobj.handle_missing_values()
+check = dataobj.nan_vals_check()
 data = dataobj.daten
-test = dataobj.explorer(sensorplots = False)
-if sum(test>0):
-    print('''Not all missing values have been handled''')
+if check:
+    data.to_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\clean_data')
 else:
-    data.to_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\Bachelorarbeit\\processed_data\\clean_data')
+    print("not all NaN values have been imputed")
