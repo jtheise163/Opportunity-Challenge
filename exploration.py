@@ -23,23 +23,54 @@ class Dataexplorer:
         plt.plot(self.time)
         
     def find_timejumps(self):
-        self.timejump = []
+        timejump = []
         i = 0
         for val in self.time_diff:
             if val <= 0:
-                self.timejump.append(i)
+                timejump.append(i)
             i += 1
+        return timejump
         
-    def split_at_timejumps(self):
-        self.datalist = []
-        self.datalist.append(self.data.iloc[0:timejump[0],:])
-        for i in range(len(timejump)-1):
-            split_of_data = self.data.iloc[timejump[i]:timejump[i+1],:]
-            self.datalist.append(split_of_data)
-
+    def data_plotter(self, sensorplots=False, timeplot=False, label=False, sensorpdf=False):
+        if timeplot:
+            timejump = self.find_timejumps()
+            plt.figure(0)
+            for xc in timejump:
+                plt.axvline(xc, color = 'red')
+            self.timegraph()
+        if sensorplots:
+            sensorchannel = 0
+            for fig in range (1,17,1):
+                if sensorchannel == 242:
+                            break
+                plt.figure(fig)
+                for subplot in range(5):
+                    plt.subplot(5,1,subplot+1)
+                    for plot in range(3):
+                        plt.plot(self.data.iloc[:,sensorchannel])
+                        for xc in timejump:
+                            plt.axvline(xc, color = 'red')
+                        sensorchannel += 1
+                        
+        if sensorpdf:
+            sensorchannel = 0
+            for fig in range (100,115,1):
+                if sensorchannel == 242:
+                        break
+                plt.figure(fig)
+                for subplot in range(16):
+                    plt.subplot(4,4,subplot+1)
+                    plt.hist(self.data.iloc[:,sensorchannel], bins=20)
+                    sensorchannel += 1
+    
+    def label_plotter(self):
+        plt.figure(200)
+        plt.plot(self.data.iloc[:,-1])
+        unique_vals = self.data.iloc[:,-1].value_counts(normalize=True)
+        plt.figure(201)
+        plt.bar([i for i in range(len(unique_vals))], unique_vals)
+                    
 
 dataobj = Dataexplorer(data)
-dataobj.timegraph()
-dataobj.find_timejumps()
-timejump = dataobj.timejump
-dataobj.split_at_timejumps()
+dataobj.label_plotter()
+
