@@ -13,7 +13,7 @@ import numpy as np
 shuffle = True
 
 
-data = pd.read_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\Bachelorarbeit\\processed_data\\clean_data').iloc[:,1:]
+data = pd.read_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\clean_data').iloc[:,1:]
 
 
 
@@ -76,5 +76,5 @@ if shuffle:
     np.random.shuffle(windowed_data_list)
    
 
-np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Bachelorarbeit\\processed_data\\windowed_data', windowed_data_list)    
+np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\windowed_data', windowed_data_list)    
     

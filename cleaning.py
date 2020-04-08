@@ -92,7 +92,6 @@ class Datencleaner:
            self.daten.iloc[:,1:-2] = scipy.signal.medfilt(self.daten.iloc[:,1:-2], (n_med,1))
              
 dataobj = Datencleaner(roh_daten)
-datatest = dataobj.daten
 a = dataobj.handle_missing_values(method = 'last_carried_forward')
 check = dataobj.nan_vals_check()
 dataobj.datafilter(mode='median', n_med = 3)
