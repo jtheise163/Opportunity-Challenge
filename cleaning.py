@@ -35,6 +35,7 @@ roh_daten = pd.concat(data)
 roh_daten = roh_daten.reset_index()  
 del data
 
+'''class to clean the data from missing values and outliers'''
 class Datencleaner:
     def __init__(self, daten):
         self.input = daten[list(daten.columns[1:243])]               
@@ -42,21 +43,24 @@ class Datencleaner:
         self.daten = pd.concat([self.input, self.label], axis = 1) 
         
 
-    def handle_missing_values(self, method = 'linear_interpolation' ):
+    def handle_missing_values(self, method = 'linear_interpolation', threshhold_missingness = 0.5 ):
         '''method to deal with nan values'''
-        # interpolates the nan values linearily with the subsequent values 
-        # non interpolateable values are set to 0
+        # features with missingness of data above 50% are now deleted
         n_rows, n_cols = np.shape(self.daten)
         for col in range(n_cols):
             n_nans = np.sum(self.daten.iloc[:,col].isna())
             percentage_nan = n_nans/n_rows
-            if  percentage_nan > 0.5:
+            if  percentage_nan > threshhold_missingness:
                 self.daten.drop(columns_names[col])
+        '''different methods to deal with missing data'''       
         if method == 'linear_interpolation':
+            # interpolates the missing data in the sensorchannels linear over time with the subsequent values
+            # if there are to much values missing subsequently then the missing values are filled with zeros
             self.input = self.input.interpolate(method='linear', limit_direction='forward', axis=0)
             self.input = self.input.fillna(0)
             self.daten = pd.concat([self.input, self.label], axis = 1)
         elif method == 'MEAN':
+            # imputes the missing values with the mean of the feature
             mean = np.mean(self.daten)
             n_rows, n_cols = np.shape(self.daten)
             for col in range (n_cols):
@@ -64,6 +68,7 @@ class Datencleaner:
                 if len(nan_pos) != 0:
                     self.daten.iloc[nan_pos,col] = mean[col]
         elif method == 'last_carried_forward':
+            # imputes values by carrying the last value forward eg. transcribing the missing value with the last observed value
             n_rows, n_cols = np.shape(self.daten)
             for col in range(n_cols):
                 nan_pos = np.where(self.daten.iloc[:,col].isna())
@@ -76,6 +81,7 @@ class Datencleaner:
            
     
     def nan_vals_check(self):
+        '''checks dataframe for nan values'''
         nan_vals = self.daten.isna()
         check = np.where (nan_vals == True)
         if len(check[0]) == 0:
@@ -88,14 +94,27 @@ class Datencleaner:
          pass
         
     def datafilter(self, mode='median', n_med = 3):
+        '''filters the data'''
         if mode=='median':
+            # mode median filters the data with a sliding median filter of stride 1 and a krenel size of :param: n_medx1
            self.daten.iloc[:,1:-2] = scipy.signal.medfilt(self.daten.iloc[:,1:-2], (n_med,1))
-             
+           
+'''main script###########################################################################################################################################################'''
+'''Hyperparameters'''
+#filtersize
+filtersize = 3   
+#threshhold of missingnes for a feature to be dropped
+threshhold_missingness = 0.5
+
+'''data processing'''          
 dataobj = Datencleaner(roh_daten)
-a = dataobj.handle_missing_values(method = 'last_carried_forward')
+a = dataobj.handle_missing_values(method = 'linear_interpolation', threshhold_missingness=0.5)
 check = dataobj.nan_vals_check()
-dataobj.datafilter(mode='median', n_med = 3)
+dataobj.datafilter(mode='median', n_med = filtersize)
 data = dataobj.daten
+
+'''checking and saving'''
+# checking if all NaNs have been removed, if so file is saved in clean data file
 if check:
     data.to_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\clean_data')
 else:
