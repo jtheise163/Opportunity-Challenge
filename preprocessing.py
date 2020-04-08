@@ -12,11 +12,15 @@ import numpy as np
 '''shuffle?'''
 shuffle = True
 
+'''Hyperparameters sliding Window'''
+window_size = 30
+stride      = 15 # overlap of 50 %
 
+'''data dir'''
 data = pd.read_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\clean_data').iloc[:,1:]
 
 
-
+'''Data Preprocessor class'''
 class Dataprocesser:
     def __init__(self, data):
         self.data = data
@@ -25,9 +29,11 @@ class Dataprocesser:
         self.freq = 1/np.mean(self.time_diff)
         
     def timegraph(self):
+        '''shows graphically where timejumps are'''
         plt.plot(self.time)
         
     def find_timejumps(self):
+        '''finds timejumps in the dataframe'''
         self.timejump = []
         i = 0
         for val in self.time_diff:
@@ -36,17 +42,22 @@ class Dataprocesser:
             i += 1
         
     def split_at_timejumps(self):
+        '''splits the dataframe in a list of dataframes that are continuous in time eg without time jumps'''
+        self.find_timejumps()
         self.datalist = []
-        self.datalist.append(self.data.iloc[0:timejump[0],:])
-        for i in range(len(timejump)-1):
-            split_of_data = self.data.iloc[timejump[i]:timejump[i+1],:]
+        self.datalist.append(self.data.iloc[0:self.timejump[0],:])
+        for i in range(len(self.timejump)-1):
+            split_of_data = self.data.iloc[self.timejump[i]:self.timejump[i+1],:]
             self.datalist.append(split_of_data)
     
     def sliding(self, dataframe, window_size, stride, shuffle = 'False'):
-        
+        '''puts a sliding window over a dataframe with
+           :param: window size: kernel size of the sliding window
+           :param: stride:      step size of the sliding window
+           :boolean: shuffle:   shuffle the windows randomly for later machine learning algorithms'''
         n_windows = int((len(dataframe)-window_size +1 )/stride)
         windowed_data = np.zeros((n_windows, window_size, np.shape(dataframe)[1]))
-        dataframe = dataframe.iloc[:n_windows*window_size,:]
+        dataframe = dataframe.iloc[:int(len(dataframe)/window_size)*window_size + int(window_size/2),:] # cutting the end of the dataframe to achieve integer window number
         
         for i in range(n_windows):
              windowed_data[i,:,:] = dataframe.iloc[i*stride:i*stride+window_size,:]
@@ -56,17 +67,13 @@ class Dataprocesser:
                 
         return windowed_data
 
-window_size = 30
 
 dataobj = Dataprocesser(data)
-dataobj.timegraph()
-dataobj.find_timejumps()
-timejump = dataobj.timejump
 dataobj.split_at_timejumps()
 datalist = dataobj.datalist
 windowed_data_list = []
 for data_piece in datalist:
-    windowed_data = dataobj.sliding(data_piece, window_size, 15)
+    windowed_data = dataobj.sliding(data_piece, window_size, stride)
     for window in windowed_data:
         windowed_data_list.append(window)
     
