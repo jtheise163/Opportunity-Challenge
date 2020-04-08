@@ -46,6 +46,12 @@ class Datencleaner:
         '''method to deal with nan values'''
         # interpolates the nan values linearily with the subsequent values 
         # non interpolateable values are set to 0
+        n_rows, n_cols = np.shape(self.daten)
+        for col in range(n_cols):
+            n_nans = np.sum(self.daten.iloc[:,col].isna())
+            percentage_nan = n_nans/n_rows
+            if  percentage_nan > 0.5:
+                self.daten.drop(columns_names[col])
         if method == 'linear_interpolation':
             self.input = self.input.interpolate(method='linear', limit_direction='forward', axis=0)
             self.input = self.input.fillna(0)
