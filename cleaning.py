@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import glob
 import matplotlib.pyplot as plt
+import scipy.signal
+
 
 
 '''daten einlesen'''
@@ -40,31 +42,54 @@ class Datencleaner:
         self.daten = pd.concat([self.input, self.label], axis = 1) 
         
 
-    def handle_missing_values(self):
+    def handle_missing_values(self, method = 'linear_interpolation' ):
         '''method to deal with nan values'''
         # interpolates the nan values linearily with the subsequent values 
         # non interpolateable values are set to 0
-        self.input = self.input.interpolate(method='linear', limit_direction='forward', axis=0)
-        self.input = self.input.fillna(0)
-        self.daten = pd.concat([self.input, self.label], axis = 1)
+        if method == 'linear_interpolation':
+            self.input = self.input.interpolate(method='linear', limit_direction='forward', axis=0)
+            self.input = self.input.fillna(0)
+            self.daten = pd.concat([self.input, self.label], axis = 1)
+        elif method == 'MEAN':
+            mean = np.mean(self.daten)
+            n_rows, n_cols = np.shape(self.daten)
+            for col in range (n_cols):
+                nan_pos = np.where(self.daten.iloc[:,col].isna())[0]
+                if len(nan_pos) != 0:
+                    self.daten.iloc[nan_pos,col] = mean[col]
+        elif method == 'last_carried_forward':
+            n_rows, n_cols = np.shape(self.daten)
+            for col in range(n_cols):
+                nan_pos = np.where(self.daten.iloc[:,col].isna())
+                for row in nan_pos:
+                    self.daten.iloc[row,col] = self.daten.iloc[row -1 , col]
+                       
+            self.daten = self.daten.fillna(0)
+            
+            
+           
     
     def nan_vals_check(self):
         nan_vals = self.daten.isna()
         check = np.where (nan_vals == True)
-        if check [1] is None:
+        if len(check[0]) == 0:
             return True
         else:
             return False
     
     def outliers(self):
-        pass
+#        self.daten, mean, std = self.z_transform(self.daten)
+         pass
         
-    
-        
-        
+    def datafilter(self, mode='median', n_med = 3):
+        if mode=='median':
+           self.daten.iloc[:,1:-2] = scipy.signal.medfilt(self.daten.iloc[:,1:-2], (n_med,1))
+             
 dataobj = Datencleaner(roh_daten)
-dataobj.handle_missing_values()
+datatest = dataobj.daten
+a = dataobj.handle_missing_values(method = 'last_carried_forward')
 check = dataobj.nan_vals_check()
+dataobj.datafilter(mode='median', n_med = 3)
 data = dataobj.daten
 if check:
     data.to_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\clean_data')
