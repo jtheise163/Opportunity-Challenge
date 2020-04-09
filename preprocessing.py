@@ -76,6 +76,31 @@ def train_test_split(data, percentage):
     test_data = data[random_index, :, :]
     return train_data, test_data
 
+def k_fold_x_val(data, k):
+    np.random.shuffle(data)
+    n_windows, window_size, n_features = np.shape(data)
+    fold_size = int(n_windows/k)
+    data = data[:fold_size*k,:,:]
+    fold_set = np.zeros((k, fold_size, window_size, n_features))
+    for fold in range(k):
+        fold_set[fold,:,:,:] = data[fold*fold_size:(fold+1)*fold_size,:,:]
+    return fold_set
+
+def z_score(data):
+    mean = np.mean(data)
+    std = np.std(data)
+    data = (data - mean)/std
+    data = np.nan_to_num(data)
+    return data
+
+def PCA(data, exp_var):
+    n_features = np.shape(data)[-1]
+    data = np.reshape(data, (-1, n_features))
+    data = z_score(data)
+    Sigma = np.cov(data)
+    U, S, V = np.linalg.svd(Sigma)
+    pC = np.dot(U.T, data)
+    return pC, U, S, V
 
 dataobj = Dataprocesser(data)
 dataobj.split_at_timejumps()
@@ -92,6 +117,8 @@ if shuffle:
     np.random.shuffle(windowed_data_list)
    
 train_data, test_data = train_test_split(windowed_data_list, 0.2)
+fold_set = k_fold_x_val(windowed_data_list, 10)
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data', train_data)    
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data', test_data)    
+np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\fold_set', test_data)    
     
