@@ -120,5 +120,5 @@ train_data, test_data = train_test_split(windowed_data_list, 0.2)
 fold_set = k_fold_x_val(windowed_data_list, 10)
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data', train_data)    
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data', test_data)    
-np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\fold_set', test_data)    
+np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\fold_set', fold_set)    
     
