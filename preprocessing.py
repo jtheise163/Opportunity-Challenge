@@ -66,6 +66,15 @@ class Dataprocesser:
                 np.random.shuffle(windowed_data)
                 
         return windowed_data
+    
+
+def train_test_split(data, percentage):
+    n_windows = np.shape(data)[0]
+    n_test = int(percentage * n_windows)
+    random_index = np.random.randint(n_windows, size=n_test)
+    train_data = np.delete(data, random_index, axis = 0)
+    test_data = data[random_index, :, :]
+    return train_data, test_data
 
 
 dataobj = Dataprocesser(data)
@@ -82,6 +91,7 @@ windowed_data_list = np.asarray(windowed_data_list)
 if shuffle:
     np.random.shuffle(windowed_data_list)
    
-
-np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\windowed_data', windowed_data_list)    
+train_data, test_data = train_test_split(windowed_data_list, 0.2)
+np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data', train_data)    
+np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data', test_data)    
     

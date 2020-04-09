@@ -6,4 +6,5 @@ Created on Fri Mar 27 16:01:54 2020
 """
 import numpy as np
 
-windowed_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\windowed_data.npy')
+train_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')
+test_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data.npy')
