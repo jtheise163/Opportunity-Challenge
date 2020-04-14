@@ -15,6 +15,8 @@ shuffle = True
 '''Hyperparameters sliding Window'''
 window_size = 30
 stride      = 15 # overlap of 50 %
+np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\stride', stride) 
+np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\window_size', window_size) 
 
 '''data dir'''
 data = pd.read_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\clean_data').iloc[:,1:]
@@ -50,7 +52,7 @@ class Dataprocesser:
             split_of_data = self.data.iloc[self.timejump[i]:self.timejump[i+1],:]
             self.datalist.append(split_of_data)
     
-    def sliding(self, dataframe, window_size, stride, shuffle = 'False'):
+    def sliding(self, dataframe, window_size, stride, shuffle = False):
         '''puts a sliding window over a dataframe with
            :param: window size: kernel size of the sliding window
            :param: stride:      step size of the sliding window
@@ -62,7 +64,7 @@ class Dataprocesser:
         for i in range(n_windows):
              windowed_data[i,:,:] = dataframe.iloc[i*stride:i*stride+window_size,:]
              
-        if shuffle == 'True':
+        if shuffle:
                 np.random.shuffle(windowed_data)
                 
         return windowed_data
@@ -121,4 +123,28 @@ fold_set = k_fold_x_val(windowed_data_list, 10)
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data', train_data)    
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data', test_data)    
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\fold_set', fold_set)    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
