@@ -5,21 +5,33 @@ Created on Fri Mar 27 16:01:54 2020
 @author: hartmann
 """
 import numpy as np
-import sklearn
 
 def z_score(data):
-    mean = np.mean(data, axis = 0)
+    '''computes z-scores of data 
+       every feature has a mean of 0 and a standard deviation of 1
+       :param:   data:   2-d Numpy array: datapoint x feature
+       :returns: z-score:2-d Numpy array: datapoint x feature (mean = 0, std=1) '''
+    mean = np.mean(data, axis = 0) #columnswise mean and standard_deviation
     std = np.std(data, axis = 0)
     data = (data - mean)/std
     data = np.nan_to_num(data)
     return data
 
 def PC_transform(X,U):
+    '''computes linear coordinate system transformation
+    :param:   X: 2-d Numpy array: datapoints
+    :param:   U: 2-d Numpy array: Transformation-matrix
+    :returns: pC: 2-d Numpy array: X in the coordinate system of U'''
     pC = np.dot(U.T, X.T)
     return pC.T
     
 
 def PCA(data):
+    '''computes linear PCA transformation
+       :param:   data: 2-d Numpy array: datapoint x feature
+       :returns: pC:   2-d Numpy array: datapoint x feature: data projected to the principal component axes
+       :returns: U:    2-d Numpy array: feature x feature:   Principal components axes
+       :returns: S:    1-d Numpy array: feature:             "Eigenvalues" of Principal component axes'''
     n_features = np.shape(data)[-1]
     data = np.reshape(data, (-1, n_features))
     data = z_score(data)
@@ -29,6 +41,10 @@ def PCA(data):
     return pC, U, S, V
 
 def unwindow(windowed_data, stride):
+    '''rearranges 3-d time window data into 2-d data
+    :param:   windowed_data: 3-d Numpy array: windows x window_size x feature: data as time windows
+    :param:   stride:        Integer-Scalar:  stepsizes of the time windows in the data
+    :returns: data:          2-d Numpy array: datapoints x feature           : data'''
     n_windows, window_size, n_features = np.shape(windowed_data)
     data_except_first_window = []
     first_loop = True
@@ -45,21 +61,22 @@ def unwindow(windowed_data, stride):
     return data
 
 def sliding(data, window_size, stride, shuffle = False):
-        '''puts a sliding window over a data array with
-          :param: window size: kernel size of the sliding window
-          :param: stride:      step size of the sliding window
-          :param: shuffle:     shuffle the windows randomly for later machine learning algorithms'''
-        n_windows = int((len(data)-window_size +1 )/stride)
-        windowed_data = np.zeros((n_windows, window_size, np.shape(data)[1]))
-        data = data[:int(len(data)/window_size)*window_size + int(window_size/2),:] # cutting the end of the dataframe to achieve integer window number
+    '''puts a sliding window over an 2-d data array
+    :param: data:        2-d Numpy array: datapoints x feature: data 
+    :param: window_size: Integer Scalar:  size of the sliding window
+    :param: stride:      Integer Scalar:  step size of the sliding window
+    :param: shuffle:     Boolean       :  shuffle the windows randomly for later machine learning algorithms?'''
+    n_windows = int((len(data)-window_size +1 )/stride)
+    windowed_data = np.zeros((n_windows, window_size, np.shape(data)[1]))
+    data = data[:int(len(data)/window_size)*window_size + int(window_size/2),:] # cutting the end of the dataframe to achieve integer window number
         
-        for i in range(n_windows):
-             windowed_data[i,:,:] = data[i*stride:i*stride+window_size,:]
+    for i in range(n_windows):
+        windowed_data[i,:,:] = data[i*stride:i*stride+window_size,:]
              
-        if shuffle:
-                np.random.shuffle(windowed_data)
+    if shuffle:
+        np.random.shuffle(windowed_data)
                 
-        return windowed_data
+    return windowed_data
     
     
 
