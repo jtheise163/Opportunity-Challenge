@@ -88,21 +88,6 @@ def k_fold_x_val(data, k):
         fold_set[fold,:,:,:] = data[fold*fold_size:(fold+1)*fold_size,:,:]
     return fold_set
 
-def z_score(data):
-    mean = np.mean(data)
-    std = np.std(data)
-    data = (data - mean)/std
-    data = np.nan_to_num(data)
-    return data
-
-def PCA(data, exp_var):
-    n_features = np.shape(data)[-1]
-    data = np.reshape(data, (-1, n_features))
-    data = z_score(data)
-    Sigma = np.cov(data)
-    U, S, V = np.linalg.svd(Sigma)
-    pC = np.dot(U.T, data)
-    return pC, U, S, V
 
 dataobj = Dataprocesser(data)
 dataobj.split_at_timejumps()

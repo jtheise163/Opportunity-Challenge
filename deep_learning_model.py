@@ -26,7 +26,7 @@ def PC_transform(X,U):
     return pC.T
     
 
-def PCA(data):
+def PCA(data, explained_variance):
     '''computes linear PCA transformation
        :param:   data: 2-d Numpy array: datapoint x feature
        :returns: pC:   2-d Numpy array: datapoint x feature: data projected to the principal component axes
@@ -38,7 +38,14 @@ def PCA(data):
     Sigma = np.cov(data.T)
     U, S, V = np.linalg.svd(Sigma)
     pC = PC_transform(data, U)
-    return pC, U, S, V
+    explained_variance_ratio = S/ len(S)
+    explained_variance_sum = 0
+    n_features_subset = 0
+    while explained_variance_sum < explained_variance or n_features_subset == len(S):
+        explained_variance_sum += explained_variance_ratio[n_features_subset] 
+        n_features_subset += 1
+    pC = pC[:,:n_features_subset]
+    return pC, n_features_subset, U, S
 
 def unwindow(windowed_data, stride):
     '''rearranges 3-d time window data into 2-d data
@@ -77,39 +84,42 @@ def sliding(data, window_size, stride, shuffle = False):
         np.random.shuffle(windowed_data)
                 
     return windowed_data
+
+def PCA_pipeline(train_data, test_data, stride):
+    #preparation for PCA on train_data
+    train_data_unwindowed = unwindow(train_data, stride)
+    #PCA on train_data
+    principal_Component, n_features_subset, principalAxes, S = PCA(train_data_unwindowed, explained_variance_max)
+    train_data_pC = sliding(principal_Component, window_size = window_size, stride = stride, shuffle = False)
+    #PCA on test data
+    test_data_pC = []
+    for window in test_data:
+        window = PC_transform(window, principalAxes)[:,:n_features_subset]
+        test_data_pC.append(window)
+    test_data_pC = np.asarray(test_data_pC)
+    return test_data_pC, train_data_pC
     
     
 
 '''Hyperparameters'''
 # PCA
+do_PCA = True
 explained_variance_max = 0.99
 stride = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\stride.npy')
 window_size = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\window_size.npy')
-
+# Train test split method
 train_test_split = 's_split'     #'s_split', 'k_fold'
 
-#import the preprocessed data
 # simple train val test split
 if train_test_split == 's_split':
+    '''importing the data'''
     train_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')
-    train_data = train_data[:,:,1:]
+    train_data = train_data[:,:,1:] #cutting of the timestamp
     test_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data.npy')
-    test_data = test_data[:,:,1:]
-    train_data_unwindowed = unwindow(train_data, stride)
-    pC, U, S, V = PCA(train_data_unwindowed)
-    explained_variance_ratio = S/len(S)
-    explained_variance_sum = 0
-    n_features_subset = 0
-    while explained_variance_sum < explained_variance_max or n_features_subset == len(S):
-        explained_variance_sum += explained_variance_ratio[n_features_subset] 
-        n_features_subset +=1
-    pC = pC[:,:n_features_subset]
-    train_data_pC = sliding(pC, window_size = window_size, stride = stride, shuffle = False)
-    test_data_pC = []
-    for window in test_data:
-        window = PC_transform(window, U)[:,:n_features_subset]
-        test_data_pC.append(window)
-    test_data_pC = np.asarray(test_data_pC)
+    test_data = test_data[:,:,1:]  #cutting of the timestamp
+    if PCA:
+        test_data, train_data = PCA_pipeline(test_data, train_data, stride)
+        
     
     
 
