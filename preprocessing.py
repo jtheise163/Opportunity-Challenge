@@ -9,9 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-'''shuffle?'''
-shuffle = True
-
 '''Hyperparameters sliding Window'''
 window_size = 30
 stride      = 15 # overlap of 50 %
@@ -88,20 +85,49 @@ def k_fold_x_val(data, k):
         fold_set[fold,:,:,:] = data[fold*fold_size:(fold+1)*fold_size,:,:]
     return fold_set
 
+def list_to_timewindow(datalist, shuffle = False):
+    windowed_data_list = []
+    for data_piece in datalist:
+        windowed_data = dataobj.sliding(data_piece, window_size, stride)
+        for window in windowed_data:
+            windowed_data_list.append(window)
+    windowed_data_list = np.asarray(windowed_data_list)
+    if shuffle:
+        np.random.shuffle(windowed_data_list)
+    return windowed_data_list
 
-dataobj = Dataprocesser(data)
-dataobj.split_at_timejumps()
-datalist = dataobj.datalist
-windowed_data_list = []
-for data_piece in datalist:
-    windowed_data = dataobj.sliding(data_piece, window_size, stride)
-    for window in windowed_data:
-        windowed_data_list.append(window)
+def democratic_Vote(labels):
+    (label, label_count) = np.unique(np.int32(labels), return_counts = True)
+    index = np.where(np.max(label_count))[0]
+    vote = label[index] 
+    vote = int(vote)
+    return vote
+
+def naive_balancer(windowed_data_list):
+    vote = []
+    for window in windowed_data_list:
+        vote.append(democratic_Vote(window[:,-1]))
+    (label_list, label_count) = np.unique(np.int32(vote), return_counts = True)
+    add = np.max(label_count) - label_count
+    label_counter = 0
+    for label in label_list:
+        label_index = np.where(vote == label)[0]
+        random_index = np.random.choice(label_index, (add[label_counter]))
+        windowed_data_list = np.concatenate((windowed_data_list, windowed_data_list[random_index,:,:]),axis=0)
+        label_counter += 1
+        
+    return windowed_data_list
+
+
+def preprocessing_pipeline(data, balanced = False):
+    dataobj = Dataprocesser(data)
+    dataobj.split_at_timejumps()
+    datalist = dataobj.datalist
+    windowed_data_list = list_to_timewindow(datalist, shuffle = True)
+    if balanced:
+        windowed_data_list = naive_balancer(windowed_data_list)
     
-    
-windowed_data_list = np.asarray(windowed_data_list)
-if shuffle:
-    np.random.shuffle(windowed_data_list)
+windowed_data_list = preprocessing_pipeline(data, balanced = True)
    
 train_data, test_data = train_test_split(windowed_data_list, 0.2)
 fold_set = k_fold_x_val(windowed_data_list, 10)
