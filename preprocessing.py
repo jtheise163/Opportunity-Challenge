@@ -120,16 +120,15 @@ def naive_balancer(windowed_data_list):
         
     return windowed_data_list
 
+def preprocessing_pipeline(data, balanced = False):
+    dataobj = Dataprocessor(data)
+    dataobj.split_at_timejumps()
+    windowed_data_list = Dataprocessor.list_to_timewindow(dataobj.datalist, shuffle = True)
+    if balanced:
+        windowed_data_list = naive_balancer(windowed_data_list)
+    return windowed_data_list
 
-balanced = True
-dataobj = Dataprocessor(data)
-dataobj.split_at_timejumps()
-datalist = dataobj.datalist
-windowed_data_list = Dataprocessor.list_to_timewindow(datalist, shuffle = True)
-if balanced:
-    windowed_data_list = naive_balancer(windowed_data_list)
-
-   
+windowed_data_list = preprocessing_pipeline(data, balanced = True)  
 train_data, test_data = train_test_split(windowed_data_list, 0.2)
 fold_set = k_fold_x_val(windowed_data_list, 10)
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data', train_data)    
