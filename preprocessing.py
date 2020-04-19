@@ -20,7 +20,7 @@ data = pd.read_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\c
 
 
 '''Data Preprocessor class'''
-class Dataprocessor:
+class Dataprocesser:
     def __init__(self, data):
         self.data = data
         self.time = data.iloc[:, 0]
@@ -48,24 +48,23 @@ class Dataprocessor:
         for i in range(len(self.timejump)-1):
             split_of_data = self.data.iloc[self.timejump[i]:self.timejump[i+1],:]
             self.datalist.append(split_of_data)
-
     
-def sliding(dataframe, window_size, stride, shuffle = False):
-    '''puts a sliding window over a dataframe with
-    :param: window size: kernel size of the sliding window
-    :param: stride:      step size of the sliding window
-    :boolean: shuffle:   shuffle the windows randomly for later machine learning algorithms'''
-    n_windows = int((len(dataframe)-window_size +1 )/stride)
-    windowed_data = np.zeros((n_windows, window_size, np.shape(dataframe)[1]))
-    dataframe = dataframe.iloc[:int(len(dataframe)/window_size)*window_size + int(window_size/2),:] # cutting the end of the dataframe to achieve integer window number
+    def sliding(self, dataframe, window_size, stride, shuffle = False):
+        '''puts a sliding window over a dataframe with
+           :param: window size: kernel size of the sliding window
+           :param: stride:      step size of the sliding window
+           :boolean: shuffle:   shuffle the windows randomly for later machine learning algorithms'''
+        n_windows = int((len(dataframe)-window_size +1 )/stride)
+        windowed_data = np.zeros((n_windows, window_size, np.shape(dataframe)[1]))
+        dataframe = dataframe.iloc[:int(len(dataframe)/window_size)*window_size + int(window_size/2),:] # cutting the end of the dataframe to achieve integer window number
         
-    for i in range(n_windows):
-        windowed_data[i,:,:] = dataframe.iloc[i*stride:i*stride+window_size,:]
+        for i in range(n_windows):
+             windowed_data[i,:,:] = dataframe.iloc[i*stride:i*stride+window_size,:]
              
-    if shuffle:
-        np.random.shuffle(windowed_data)
+        if shuffle:
+                np.random.shuffle(windowed_data)
                 
-    return windowed_data
+        return windowed_data
     
 
 def train_test_split(data, percentage):
@@ -89,7 +88,7 @@ def k_fold_x_val(data, k):
 def list_to_timewindow(datalist, shuffle = False):
     windowed_data_list = []
     for data_piece in datalist:
-        windowed_data = Dataprocessor.sliding(data_piece, window_size, stride)
+        windowed_data = dataobj.sliding(data_piece, window_size, stride)
         for window in windowed_data:
             windowed_data_list.append(window)
     windowed_data_list = np.asarray(windowed_data_list)
@@ -120,15 +119,14 @@ def naive_balancer(windowed_data_list):
     return windowed_data_list
 
 
-def preprocessing_pipeline(data, balanced = False):
-    dataobj = Dataprocessor(data)
-    dataobj.split_at_timejumps()
-    datalist = dataobj.datalist
-    windowed_data_list = list_to_timewindow(datalist, shuffle = True)
-    if balanced:
-        windowed_data_list = naive_balancer(windowed_data_list)
-    
-windowed_data_list = preprocessing_pipeline(data, balanced = True)
+balanced = True
+dataobj = Dataprocesser(data)
+dataobj.split_at_timejumps()
+datalist = dataobj.datalist
+windowed_data_list = list_to_timewindow(datalist, shuffle = True)
+if balanced:
+    windowed_data_list = naive_balancer(windowed_data_list)
+
    
 train_data, test_data = train_test_split(windowed_data_list, 0.2)
 fold_set = k_fold_x_val(windowed_data_list, 10)
