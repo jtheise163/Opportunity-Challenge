@@ -20,7 +20,7 @@ data = pd.read_csv('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\c
 
 
 '''Data Preprocessor class'''
-class Dataprocesser:
+class Dataprocessor:
     def __init__(self, data):
         self.data = data
         self.time = data.iloc[:, 0]
@@ -49,7 +49,8 @@ class Dataprocesser:
             split_of_data = self.data.iloc[self.timejump[i]:self.timejump[i+1],:]
             self.datalist.append(split_of_data)
     
-    def sliding(self, dataframe, window_size, stride, shuffle = False):
+    @staticmethod
+    def sliding(dataframe, window_size, stride, shuffle = False):
         '''puts a sliding window over a dataframe with
            :param: window size: kernel size of the sliding window
            :param: stride:      step size of the sliding window
@@ -65,6 +66,18 @@ class Dataprocesser:
                 np.random.shuffle(windowed_data)
                 
         return windowed_data
+    
+    @staticmethod
+    def list_to_timewindow(datalist, shuffle = False):
+        windowed_data_list = []
+        for data_piece in datalist:
+            windowed_data = Dataprocessor.sliding(data_piece, window_size, stride)
+            for window in windowed_data:
+                windowed_data_list.append(window)
+        windowed_data_list = np.asarray(windowed_data_list)
+        if shuffle:
+            np.random.shuffle(windowed_data_list)
+        return windowed_data_list
     
 
 def train_test_split(data, percentage):
@@ -84,17 +97,6 @@ def k_fold_x_val(data, k):
     for fold in range(k):
         fold_set[fold,:,:,:] = data[fold*fold_size:(fold+1)*fold_size,:,:]
     return fold_set
-
-def list_to_timewindow(datalist, shuffle = False):
-    windowed_data_list = []
-    for data_piece in datalist:
-        windowed_data = dataobj.sliding(data_piece, window_size, stride)
-        for window in windowed_data:
-            windowed_data_list.append(window)
-    windowed_data_list = np.asarray(windowed_data_list)
-    if shuffle:
-        np.random.shuffle(windowed_data_list)
-    return windowed_data_list
 
 def democratic_Vote(labels):
     (label, label_count) = np.unique(np.int32(labels), return_counts = True)
@@ -120,10 +122,10 @@ def naive_balancer(windowed_data_list):
 
 
 balanced = True
-dataobj = Dataprocesser(data)
+dataobj = Dataprocessor(data)
 dataobj.split_at_timejumps()
 datalist = dataobj.datalist
-windowed_data_list = list_to_timewindow(datalist, shuffle = True)
+windowed_data_list = Dataprocessor.list_to_timewindow(datalist, shuffle = True)
 if balanced:
     windowed_data_list = naive_balancer(windowed_data_list)
 
