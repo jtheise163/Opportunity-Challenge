@@ -59,7 +59,7 @@ class Datencleaner:
         features_delete = np.concatenate([features_delete, np.arange(98, 102)])
         features_delete = np.concatenate([features_delete, np.arange(134, 243)])
         features_delete = np.concatenate([features_delete, np.arange(244, 249)])
-        self.daten = pd.DataFrame.drop(self.daten, features_delete, axis = 'columns')
+        self.daten = pd.DataFrame.drop(self.daten, self.column_names[features_delete + 1], axis = 'columns')
 
     def handle_missing_values(self, method = 'linear_interpolation', threshhold_missingness = 0.5 ):
         '''method to deal with nan values'''
