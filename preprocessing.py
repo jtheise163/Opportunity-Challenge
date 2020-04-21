@@ -27,6 +27,9 @@ class Dataprocessor:
         self.time_diff = np.diff(self.time)
         self.freq = 1/np.mean(self.time_diff)
         
+    def label_changer(self):
+        self.data.iloc[:,-1] = self.data.iloc[:,-1].replace({4: 3, 5: 4})
+        
     def timegraph(self):
         '''shows graphically where timejumps are'''
         plt.plot(self.time)
@@ -48,6 +51,7 @@ class Dataprocessor:
         for i in range(len(self.timejump)-1):
             split_of_data = self.data.iloc[self.timejump[i]:self.timejump[i+1],:]
             self.datalist.append(split_of_data)
+            
     
     @staticmethod
     def sliding(dataframe, window_size, stride, shuffle = False):
@@ -120,20 +124,22 @@ def naive_balancer(windowed_data_list):
         
     return windowed_data_list
 
-def preprocessing_pipeline(data, balanced = False):
+def preprocessing_pipeline(data, validation_split = 'simple_train_test', balanced = False):
     dataobj = Dataprocessor(data)
+    dataobj.label_changer()
     dataobj.split_at_timejumps()
     windowed_data_list = Dataprocessor.list_to_timewindow(dataobj.datalist, shuffle = True)
+    train_data, test_data = train_test_split(windowed_data_list, 0.2)
     if balanced:
-        windowed_data_list = naive_balancer(windowed_data_list)
-    return windowed_data_list
+        train_data = naive_balancer(train_data)
+    return train_data, test_data
 
-windowed_data_list = preprocessing_pipeline(data, balanced = True)  
-train_data, test_data = train_test_split(windowed_data_list, 0.2)
-fold_set = k_fold_x_val(windowed_data_list, 10)
+train_data, test_data = preprocessing_pipeline(data, balanced = True)  
+
+#fold_set = k_fold_x_val(windowed_data_list, 10)
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data', train_data)    
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data', test_data)    
-np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\fold_set', fold_set)    
+#np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\fold_set', fold_set)    
 
 
 

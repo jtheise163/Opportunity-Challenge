@@ -37,11 +37,29 @@ del data
 
 '''class to clean the data from missing values and outliers'''
 class Datencleaner:
-    def __init__(self, daten):
+    def __init__(self, daten, column_names):
         self.input = daten[list(daten.columns[1:243])]               
         self.label = daten['Column: 244 Locomotion']                     #label spalte 244
         self.daten = pd.concat([self.input, self.label], axis = 1) 
+        self.column_names = column_names
         
+    def select_columns_opp(self):
+        """Selection of the 113 columns employed in the OPPORTUNITY challenge
+        :param data: numpy integer matrix
+            Sensor data (all features)
+        :return: numpy integer matrix
+            Selection of features
+        """
+    
+        #                     included-excluded
+        features_delete = np.arange(46, 50)
+        features_delete = np.concatenate([features_delete, np.arange(59, 63)])
+        features_delete = np.concatenate([features_delete, np.arange(72, 76)])
+        features_delete = np.concatenate([features_delete, np.arange(85, 89)])
+        features_delete = np.concatenate([features_delete, np.arange(98, 102)])
+        features_delete = np.concatenate([features_delete, np.arange(134, 243)])
+        features_delete = np.concatenate([features_delete, np.arange(244, 249)])
+        self.daten = pd.DataFrame.drop(self.daten, features_delete, axis = 'columns')
 
     def handle_missing_values(self, method = 'linear_interpolation', threshhold_missingness = 0.5 ):
         '''method to deal with nan values'''
@@ -51,7 +69,7 @@ class Datencleaner:
             n_nans = np.sum(self.daten.iloc[:,col].isna())
             percentage_nan = n_nans/n_rows
             if  percentage_nan > threshhold_missingness:
-                self.daten.drop(columns_names[col])
+                self.daten.drop(self.columns_names[col])
         '''different methods to deal with missing data'''       
         if method == 'linear_interpolation':
             # interpolates the missing data in the sensorchannels linear over time with the subsequent values
@@ -107,7 +125,8 @@ filtersize = 3
 threshhold_missingness = 0.5
 
 '''data processing'''          
-dataobj = Datencleaner(roh_daten)
+dataobj = Datencleaner(roh_daten, column_names)
+dataobj.select_columns_opp()
 a = dataobj.handle_missing_values(method = 'linear_interpolation', threshhold_missingness=0.5)
 check = dataobj.nan_vals_check()
 dataobj.datafilter(mode='median', n_med = filtersize)

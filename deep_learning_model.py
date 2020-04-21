@@ -5,6 +5,14 @@ Created on Fri Mar 27 16:01:54 2020
 @author: hartmann
 """
 import numpy as np
+import keras
+from keras.layers import Conv1D
+from keras.layers import MaxPooling1D
+from keras.layers import Flatten
+from keras.layers import Dense
+from keras.layers import LSTM
+import tensorflow as tf
+import matplotlib.pyplot as plt
 
 def z_score(data):
     '''computes z-scores of data 
@@ -121,11 +129,40 @@ if train_test_split == 's_split':
         test_data, train_data = PCA_pipeline(test_data, train_data, stride)
         
     
+    '''Deep Learning Model'''
+    model =   keras.models.Sequential()
+    model.add(Conv1D(50, kernel_size = 5, input_shape = (np.shape(train_data)[1], np.shape(train_data)[2] - 1), activation = 'relu', padding = 'same'))
+    #model.add(MaxPooling1D(pool_size=2, strides=2, padding = 'valid', data_format = 'channels_last'))
+    model.add(Conv1D(40, kernel_size = 5, activation = 'relu', padding = 'same'))
+    #model.add(MaxPooling1D(pool_size=2, strides=3, padding = 'valid', data_format = 'channels_last'))
+    model.add(Conv1D(20, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'same'))
+    model.add(LSTM(20, return_sequences=True))
+    model.add(Dense(5, activation='softmax'))
+    
+    '''training the model'''
+    model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['accuracy'])
+    history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical(train_data[:,:,-1]), epochs = 100, validation_split = 0.2)
     
 
-
-
-
+    ''' summarize history for accuracy'''
+    plt.figure(4)
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    
+    ''' summarize history for loss'''
+    plt.figure(5)
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()  
 
 
 
