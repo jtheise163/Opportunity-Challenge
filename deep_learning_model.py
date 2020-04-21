@@ -117,7 +117,7 @@ if train_test_split == 's_split':
     train_data = train_data[:,:,1:] #cutting of the timestamp
     test_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data.npy')
     test_data = test_data[:,:,1:]  #cutting of the timestamp
-    if d0_PCA:
+    if do_PCA:
         test_data, train_data = PCA_pipeline(test_data, train_data, stride)
         
     
