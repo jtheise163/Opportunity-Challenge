@@ -49,7 +49,7 @@ class Dataprocessor:
         self.datalist = []
         self.datalist.append(self.data.iloc[0:self.timejump[0],:])
         for i in range(len(self.timejump)-1):
-            split_of_data = self.data.iloc[self.timejump[i]:self.timejump[i+1],:]
+            split_of_data = self.data.iloc[self.timejump[i] +1:self.timejump[i+1],:]
             self.datalist.append(split_of_data)
             
     
@@ -72,10 +72,10 @@ class Dataprocessor:
         return windowed_data
     
     @staticmethod
-    def list_to_timewindow(datalist, shuffle = False):
+    def list_to_timewindow(datalist, window_size, stride, shuffle = False):
         windowed_data_list = []
         for data_piece in datalist:
-            windowed_data = Dataprocessor.sliding(data_piece, window_size, stride)
+            windowed_data = Dataprocessor.sliding(data_piece, window_size = window_size, stride = stride, shuffle = shuffle)
             for window in windowed_data:
                 windowed_data_list.append(window)
         windowed_data_list = np.asarray(windowed_data_list)
@@ -109,32 +109,32 @@ def democratic_Vote(labels):
     vote = int(vote)
     return vote
 
-def naive_balancer(windowed_data_list):
-    vote = []
-    for window in windowed_data_list:
-        vote.append(democratic_Vote(window[:,-1]))
-    (label_list, label_count) = np.unique(np.int32(vote), return_counts = True)
-    add = np.max(label_count) - label_count
-    label_counter = 0
-    for label in label_list:
-        label_index = np.where(vote == label)[0]
-        random_index = np.random.choice(label_index, (add[label_counter]))
-        windowed_data_list = np.concatenate((windowed_data_list, windowed_data_list[random_index,:,:]),axis=0)
-        label_counter += 1
+#def naive_balancer(windowed_data_list):
+#    vote = []
+#    for window in windowed_data_list:
+#        vote.append(democratic_Vote(window[:,-1]))
+#    (label_list, label_count) = np.unique(np.int32(vote), return_counts = True)
+#    add = np.max(label_count) - label_count
+#    label_counter = 0
+#    for label in label_list:
+#        label_index = np.where(vote == label)[0]
+#        random_index = np.random.choice(label_index, (add[label_counter]))
+#        windowed_data_list = np.concatenate((windowed_data_list, windowed_data_list[random_index,:,:]),axis=0)
+#        label_counter += 1
         
-    return windowed_data_list
+#    return windowed_data_list
 
-def preprocessing_pipeline(data, validation_split = 'simple_train_test', balanced = False):
+def preprocessing_pipeline(data, window_size, stride, validation_split = 'simple_train_test'):
     dataobj = Dataprocessor(data)
     dataobj.label_changer()
     dataobj.split_at_timejumps()
-    windowed_data_list = Dataprocessor.list_to_timewindow(dataobj.datalist, shuffle = True)
+    windowed_data_list = Dataprocessor.list_to_timewindow(dataobj.datalist, window_size = window_size, stride = stride, shuffle = True)
     train_data, test_data = train_test_split(windowed_data_list, 0.2)
-    if balanced:
-        train_data = naive_balancer(train_data)
     return train_data, test_data
+    
 
-train_data, test_data = preprocessing_pipeline(data, balanced = True)  
+train_data, test_data = preprocessing_pipeline(data, window_size = window_size, stride = stride)  
+
 
 #fold_set = k_fold_x_val(windowed_data_list, 10)
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data', train_data)    

@@ -38,9 +38,10 @@ del data
 '''class to clean the data from missing values and outliers'''
 class Datencleaner:
     def __init__(self, daten, column_names):
-        self.input = daten[list(daten.columns[1:243])]               
+        self.input = daten.iloc[:,2:244]    
         self.label = daten['Column: 244 Locomotion']                     #label spalte 244
         self.daten = pd.concat([self.input, self.label], axis = 1) 
+        self.timestamp = daten.iloc[:,1]
         self.column_names = column_names
         
     def select_columns_opp(self):
@@ -52,14 +53,16 @@ class Datencleaner:
         """
     
         #                     included-excluded
-        features_delete = np.arange(46, 50)
-        features_delete = np.concatenate([features_delete, np.arange(59, 63)])
-        features_delete = np.concatenate([features_delete, np.arange(72, 76)])
-        features_delete = np.concatenate([features_delete, np.arange(85, 89)])
-        features_delete = np.concatenate([features_delete, np.arange(98, 102)])
-        features_delete = np.concatenate([features_delete, np.arange(134, 243)])
-        features_delete = np.concatenate([features_delete, np.arange(244, 249)])
-        self.daten = pd.DataFrame.drop(self.daten, self.column_names[features_delete + 1], axis = 'columns')
+        
+        features_delete = np.arange(45, 49)
+        features_delete = np.hstack([features_delete, np.arange(58, 62)])
+        features_delete = np.hstack([features_delete, np.arange(71, 75)])
+        features_delete = np.hstack([features_delete, np.arange(84, 88)])
+        features_delete = np.hstack([features_delete, np.arange(97, 101)])
+        features_delete = np.hstack([features_delete, np.arange(133, 242)])
+        feature_column = list(self.daten.columns[np.int16(features_delete)])
+        pd.DataFrame.drop(self.daten, columns = feature_column, inplace = True)
+        return feature_column
 
     def handle_missing_values(self, method = 'linear_interpolation', threshhold_missingness = 0.5 ):
         '''method to deal with nan values'''
@@ -69,14 +72,13 @@ class Datencleaner:
             n_nans = np.sum(self.daten.iloc[:,col].isna())
             percentage_nan = n_nans/n_rows
             if  percentage_nan > threshhold_missingness:
-                self.daten.drop(self.columns_names[col])
+                self.daten.drop(columns = self.daten.columns[col], inplace = True)
         '''different methods to deal with missing data'''       
         if method == 'linear_interpolation':
             # interpolates the missing data in the sensorchannels linear over time with the subsequent values
             # if there are to much values missing subsequently then the missing values are filled with zeros
-            self.input = self.input.interpolate(method='linear', limit_direction='forward', axis=0)
-            self.input = self.input.fillna(0)
-            self.daten = pd.concat([self.input, self.label], axis = 1)
+            self.daten = self.daten.interpolate(method='linear', limit_direction='forward', axis=0)
+            self.daten = self.daten.fillna(0)
         elif method == 'MEAN':
             # imputes the missing values with the mean of the feature
             mean = np.mean(self.daten)
@@ -126,11 +128,13 @@ threshhold_missingness = 0.5
 
 '''data processing'''          
 dataobj = Datencleaner(roh_daten, column_names)
-dataobj.select_columns_opp()
-a = dataobj.handle_missing_values(method = 'linear_interpolation', threshhold_missingness=0.5)
+feature_column = dataobj.select_columns_opp()
+dataobj.handle_missing_values(method = 'linear_interpolation', threshhold_missingness=0.5)
 check = dataobj.nan_vals_check()
 dataobj.datafilter(mode='median', n_med = filtersize)
 data = dataobj.daten
+data = data.iloc[:,1:]
+data = pd.concat([dataobj.timestamp, data], axis = 1)
 
 '''checking and saving'''
 # checking if all NaNs have been removed, if so file is saved in clean data file

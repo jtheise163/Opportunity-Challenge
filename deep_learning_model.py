@@ -97,21 +97,46 @@ def PCA_pipeline(train_data, test_data, stride):
     #preparation for PCA on train_data
     train_data_unwindowed = unwindow(train_data, stride)
     #PCA on train_data
-    principal_Component, n_features_subset, principalAxes, S = PCA(train_data_unwindowed, explained_variance_max)
-    train_data_pC = sliding(principal_Component, window_size = window_size, stride = stride, shuffle = False)
+    principal_Component, n_features_subset, principalAxes, S = PCA(train_data_unwindowed[:,:-1], explained_variance_max)
+    train_data = np.hstack((principal_Component, train_data_unwindowed[:,-1].reshape((-1,1))))
+    train_data_pC = sliding(train_data, window_size = window_size, stride = stride, shuffle = False)
     #PCA on test data
     test_data_pC = []
-    for window in test_data:
+    for window in test_data[:,:,:-1]:
+        window = z_score(window)
         window = PC_transform(window, principalAxes)[:,:n_features_subset]
         test_data_pC.append(window)
     test_data_pC = np.asarray(test_data_pC)
-    return test_data_pC, train_data_pC
-    
-    
+    #print(np.shape(test_data_pC), np.shape(test_data[:,:,-1].reshape((-1, window_size, 1))))
+    test_data_pC = np.concatenate((test_data_pC, test_data[:,:,-1].reshape((-1, window_size, 1)), ), axis = 2)
+    return train_data_pC, test_data_pC
+
+def democratic_Vote(labels):
+    (label, label_count) = np.unique(np.int32(labels), return_counts = True)
+    index = np.where(np.max(label_count))[0]
+    vote = label[index] 
+    vote = int(vote)
+    return vote
+
+   
+def naive_balancer(windowed_data_list):
+    vote = []
+    for window in windowed_data_list:
+        vote.append(democratic_Vote(window[:,-1]))
+    (label_list, label_count) = np.unique(np.int32(vote), return_counts = True)
+    add = np.max(label_count) - label_count
+    label_counter = 0
+    for label in label_list:
+        label_index = np.where(vote == label)[0]
+        random_index = np.random.choice(label_index, (add[label_counter]))
+        windowed_data_list = np.concatenate((windowed_data_list, windowed_data_list[random_index,:,:]),axis=0)
+        label_counter += 1 
+    return windowed_data_list
 
 '''Hyperparameters'''
 # PCA
-do_PCA = False
+do_PCA = True
+do_balancing = True
 explained_variance_max = 0.99
 stride = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\stride.npy')
 window_size = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\window_size.npy')
@@ -126,8 +151,9 @@ if train_test_split == 's_split':
     test_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\test_data.npy')
     test_data = test_data[:,:,1:]  #cutting of the timestamp
     if do_PCA:
-        test_data, train_data = PCA_pipeline(test_data, train_data, stride)
-        
+        train_data, test_data = PCA_pipeline(train_data, test_data, stride)
+    if do_balancing:
+      train_data = naive_balancer(train_data)
     
     '''Deep Learning Model'''
     model =   keras.models.Sequential()
@@ -136,13 +162,32 @@ if train_test_split == 's_split':
     model.add(Conv1D(40, kernel_size = 5, activation = 'relu', padding = 'same'))
     #model.add(MaxPooling1D(pool_size=2, strides=3, padding = 'valid', data_format = 'channels_last'))
     model.add(Conv1D(20, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'same'))
+    #model.add(LSTM(20, return_sequences=True))
     model.add(LSTM(20, return_sequences=True))
     model.add(Dense(5, activation='softmax'))
     
+#    '''training the model'''
+#    model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['accuracy'])
+#    history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical([democratic_Vote(train_data[i,:,-1]) for i in range(np.shape(train_data)[0])]), epochs = 10, validation_split = 0.2, batch_size = 100, shuffle = True)
+#    
+#    cont = input('do you wanna continue[Y],[N]')
+#    while cont == 'Y':
+#        history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical([democratic_Vote(train_data[i,:,-1]) for i in range(np.shape(train_data)[0])]), epochs = 10, validation_split = 0.2, batch_size = 100, shuffle = True)
+#        cont = input('do you wanna continue[Y],[N]')
+#    
+#    score = model.evaluate(test_data[:,:,:-1], tf.keras.utils.to_categorical([democratic_Vote(test_data[i,:,-1]) for i in range(np.shape(test_data)[0])]))
+    
+    
     '''training the model'''
     model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['accuracy'])
-    history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical(train_data[:,:,-1]), epochs = 100, validation_split = 0.2)
+    history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical(train_data[:,:,-1]), epochs = 100, validation_split = 0.2, batch_size = 100, shuffle = True)
     
+    cont = input('do you wanna continue[Y],[N]')
+    while cont == 'Y':
+        history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical(train_data[:,:,-1]), epochs = 10, validation_split = 0.2, batch_size = 100, shuffle = True)
+        cont = input('do you wanna continue[Y],[N]')
+    
+    score = model.evaluate(test_data[:,:,:-1], tf.keras.utils.to_categorical(test_data[:,:,-1]))
 
     ''' summarize history for accuracy'''
     plt.figure(4)
@@ -151,7 +196,7 @@ if train_test_split == 's_split':
     plt.title('model accuracy')
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
+    plt.legend(['train', 'val'], loc='upper left')
     plt.show()
     
     ''' summarize history for loss'''
@@ -161,7 +206,7 @@ if train_test_split == 's_split':
     plt.title('model loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
+    plt.legend(['train', 'val'], loc='upper left')
     plt.show()  
 
 
