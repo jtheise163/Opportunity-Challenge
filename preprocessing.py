@@ -28,7 +28,7 @@ class Dataprocessor:
         self.freq = 1/np.mean(self.time_diff)
         
     def label_changer(self):
-        self.data.iloc[:,-1] = self.data.iloc[:,-1].replace({4: 3, 5: 4})
+        self.data.iloc[:,-1] = self.data.iloc[:,-1].replace({0:-1, 1:0, 2:1,  4:2, 5:3})
         
     def timegraph(self):
         '''shows graphically where timejumps are'''
@@ -130,6 +130,8 @@ def preprocessing_pipeline(data, window_size, stride, validation_split = 'simple
     dataobj.split_at_timejumps()
     windowed_data_list = Dataprocessor.list_to_timewindow(dataobj.datalist, window_size = window_size, stride = stride, shuffle = True)
     train_data, test_data = train_test_split(windowed_data_list, 0.2)
+    train_data = train_data[:,:,1:]
+    test_data = test_data[:,:,1:]
     return train_data, test_data
     
 

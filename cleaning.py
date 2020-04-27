@@ -133,7 +133,7 @@ dataobj.handle_missing_values(method = 'linear_interpolation', threshhold_missin
 check = dataobj.nan_vals_check()
 dataobj.datafilter(mode='median', n_med = filtersize)
 data = dataobj.daten
-data = data.iloc[:,1:]
+#data = data.iloc[:,1:]
 data = pd.concat([dataobj.timestamp, data], axis = 1)
 
 '''checking and saving'''

@@ -13,6 +13,7 @@ from keras.layers import Dense
 from keras.layers import LSTM
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from scipy import stats
 
 def z_score(data):
     '''computes z-scores of data 
@@ -40,8 +41,8 @@ def PCA(data, explained_variance):
        :returns: pC:   2-d Numpy array: datapoint x feature: data projected to the principal component axes
        :returns: U:    2-d Numpy array: feature x feature:   Principal components axes
        :returns: S:    1-d Numpy array: feature:             "Eigenvalues" of Principal component axes'''
-    n_features = np.shape(data)[-1]
-    data = np.reshape(data, (-1, n_features))
+#    n_features = np.shape(data)[-1]
+#    data = np.reshape(data, (-1, n_features))
     data = z_score(data)
     Sigma = np.cov(data.T)
     U, S, V = np.linalg.svd(Sigma)
@@ -102,13 +103,15 @@ def PCA_pipeline(train_data, test_data, stride):
     train_data_pC = sliding(train_data, window_size = window_size, stride = stride, shuffle = False)
     #PCA on test data
     test_data_pC = []
+    counter = 0
     for window in test_data[:,:,:-1]:
         window = z_score(window)
         window = PC_transform(window, principalAxes)[:,:n_features_subset]
+        window = np.concatenate((window, test_data[counter,:,-1].reshape(-1,1)), axis = 1)
         test_data_pC.append(window)
+        counter += 1
     test_data_pC = np.asarray(test_data_pC)
     #print(np.shape(test_data_pC), np.shape(test_data[:,:,-1].reshape((-1, window_size, 1))))
-    test_data_pC = np.concatenate((test_data_pC, test_data[:,:,-1].reshape((-1, window_size, 1)), ), axis = 2)
     return train_data_pC, test_data_pC
 
 def democratic_Vote(labels):
@@ -133,9 +136,46 @@ def naive_balancer(windowed_data_list):
         label_counter += 1 
     return windowed_data_list
 
+def z_score_pipeline(train_data, test_data):
+    train_data_z = [] 
+    counter = 0
+    for window in train_data[:,:,:-1]:
+        window = z_score(window)
+        window = np.concatenate((window, train_data[counter, :, -1].reshape((-1,1))), axis = 1)
+        train_data_z.append(window)
+        counter += 1
+    train_data_z = np.asarray(train_data_z)
+    
+    test_data_z = [] 
+    counter = 0
+    for window in test_data[:,:,:-1]:
+        window = z_score(window)
+        window = np.concatenate((window, test_data[counter, :, -1].reshape((-1,1))), axis = 1)
+        test_data_z.append(window)
+        counter += 1
+    test_data_z = np.asarray(test_data_z)
+    return train_data_z, test_data_z
+
+def one_hot_builder(label_array, n_classes):
+    label_array = stats.mode(label_array, axis =1)[0]
+    label_array = label_array.reshape((-1))
+    cat_label = []
+    for label in label_array:
+        if label == -1:
+            cat_label.append([0,0,0,0])
+        else:
+            cat_label.append(tf.keras.utils.to_categorical(label,4))
+    cat_label = np.asarray(cat_label)
+    cat_label = cat_label.reshape((-1, n_classes))
+    return cat_label
+    
+        
+
 '''Hyperparameters'''
+#DeepLearningModel
+n_classes = 4
 # PCA
-do_PCA = True
+do_PCA = False
 do_balancing = True
 explained_variance_max = 0.99
 stride = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\stride.npy')
@@ -152,8 +192,12 @@ if train_test_split == 's_split':
     test_data = test_data[:,:,1:]  #cutting of the timestamp
     if do_PCA:
         train_data, test_data = PCA_pipeline(train_data, test_data, stride)
+    else:
+        train_data, test_data= z_score_pipeline(train_data, test_data)
     if do_balancing:
       train_data = naive_balancer(train_data)
+     
+
     
     '''Deep Learning Model'''
     model =   keras.models.Sequential()
@@ -163,8 +207,9 @@ if train_test_split == 's_split':
     #model.add(MaxPooling1D(pool_size=2, strides=3, padding = 'valid', data_format = 'channels_last'))
     model.add(Conv1D(20, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'same'))
     #model.add(LSTM(20, return_sequences=True))
-    model.add(LSTM(20, return_sequences=True))
-    model.add(Dense(5, activation='softmax'))
+    #model.add(LSTM(20, return_sequences=True))
+    model.add(LSTM(20, return_sequences=False))
+    model.add(Dense(n_classes, activation='softmax'))
     
 #    '''training the model'''
 #    model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['accuracy'])
@@ -180,14 +225,14 @@ if train_test_split == 's_split':
     
     '''training the model'''
     model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['accuracy'])
-    history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical(train_data[:,:,-1]), epochs = 100, validation_split = 0.2, batch_size = 100, shuffle = True)
+    history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes), epochs = 100, validation_split = 0.2, batch_size = 100, shuffle = True)
     
     cont = input('do you wanna continue[Y],[N]')
     while cont == 'Y':
-        history = model.fit(train_data[:,:,:-1], tf.keras.utils.to_categorical(train_data[:,:,-1]), epochs = 10, validation_split = 0.2, batch_size = 100, shuffle = True)
+        history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes), epochs = 10, validation_split = 0.2, batch_size = 100, shuffle = True)
         cont = input('do you wanna continue[Y],[N]')
     
-    score = model.evaluate(test_data[:,:,:-1], tf.keras.utils.to_categorical(test_data[:,:,-1]))
+    score = model.evaluate(test_data[:,:,:-1], one_hot_builder(test_data[:,:,-1], n_classes))
 
     ''' summarize history for accuracy'''
     plt.figure(4)
