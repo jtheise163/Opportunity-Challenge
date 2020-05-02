@@ -11,9 +11,11 @@ from keras.layers import MaxPooling1D
 from keras.layers import Flatten
 from keras.layers import Dense
 from keras.layers import LSTM
+from keras.layers import Flatten
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from scipy import stats
+from sklearn.neighbors import NearestNeighbors
 
 def z_score(data):
     '''computes z-scores of data 
@@ -121,6 +123,13 @@ def democratic_Vote(labels):
     vote = int(vote)
     return vote
 
+def generate(parent1, parent2):
+    n_timesteps, n_features = np.shape(parent1)
+    random_array = np.random.rand(n_timesteps, n_features)
+    inv_random_array = np.ones((n_timesteps, n_features)) - random_array
+    child = np.multiply(random_array, parent1) + np.multiply(inv_random_array, parent2)
+    return child
+
    
 def naive_balancer(windowed_data_list):
     vote = []
@@ -135,6 +144,14 @@ def naive_balancer(windowed_data_list):
         windowed_data_list = np.concatenate((windowed_data_list, windowed_data_list[random_index,:,:]),axis=0)
         label_counter += 1 
     return windowed_data_list
+
+
+
+
+#
+#def ADASYN(data):
+#    neighbours = 
+#    pass
 
 def z_score_pipeline(train_data, test_data):
     train_data_z = [] 
@@ -156,17 +173,28 @@ def z_score_pipeline(train_data, test_data):
     test_data_z = np.asarray(test_data_z)
     return train_data_z, test_data_z
 
-def one_hot_builder(label_array, n_classes):
-    label_array = stats.mode(label_array, axis =1)[0]
-    label_array = label_array.reshape((-1))
-    cat_label = []
-    for label in label_array:
-        if label == -1:
-            cat_label.append([0,0,0,0])
-        else:
-            cat_label.append(tf.keras.utils.to_categorical(label,4))
-    cat_label = np.asarray(cat_label)
-    cat_label = cat_label.reshape((-1, n_classes))
+def one_hot_builder(label_array, n_classes, window_size, mode = 'many_to_many'):
+    if mode == 'many_to_one':
+        label_array = stats.mode(label_array, axis =1)[0]
+        label_array = label_array.reshape((-1))
+        cat_label = []
+        for label in label_array:
+            if label == -1:
+                cat_label.append([0,0,0,0])
+            else:
+                cat_label.append(tf.keras.utils.to_categorical(label,4))
+        cat_label = np.asarray(cat_label)
+        cat_label = cat_label.reshape((-1, n_classes))
+    else:
+        label_array = label_array.reshape((-1))
+        cat_label = []
+        for label in label_array:
+            if label == -1:
+                cat_label.append([0,0,0,0])
+            else:
+                cat_label.append(tf.keras.utils.to_categorical(label, 4))
+        cat_label = np.asarray(cat_label)
+        cat_label = cat_label.reshape((-1, window_size, n_classes))
     return cat_label
     
         
@@ -201,14 +229,18 @@ if train_test_split == 's_split':
     
     '''Deep Learning Model'''
     model =   keras.models.Sequential()
-    model.add(Conv1D(50, kernel_size = 5, input_shape = (np.shape(train_data)[1], np.shape(train_data)[2] - 1), activation = 'relu', padding = 'same'))
+    model.add(Conv1D(64, kernel_size = 5, input_shape = (np.shape(train_data)[1], np.shape(train_data)[2] - 1), activation = 'relu', padding = 'valid'))
     #model.add(MaxPooling1D(pool_size=2, strides=2, padding = 'valid', data_format = 'channels_last'))
-    model.add(Conv1D(40, kernel_size = 5, activation = 'relu', padding = 'same'))
+    model.add(Conv1D(64, kernel_size = 5, activation = 'relu', padding = 'valid'))
     #model.add(MaxPooling1D(pool_size=2, strides=3, padding = 'valid', data_format = 'channels_last'))
-    model.add(Conv1D(20, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'same'))
+    model.add(Conv1D(64, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(64, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(64, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(64, kernel_size = 4, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Flatten())
     #model.add(LSTM(20, return_sequences=True))
     #model.add(LSTM(20, return_sequences=True))
-    model.add(LSTM(20, return_sequences=False))
+#    model.add(LSTM(128, return_sequences=False))
     model.add(Dense(n_classes, activation='softmax'))
     
 #    '''training the model'''
@@ -225,14 +257,14 @@ if train_test_split == 's_split':
     
     '''training the model'''
     model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['accuracy'])
-    history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes), epochs = 100, validation_split = 0.2, batch_size = 100, shuffle = True)
+    history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes, window_size, mode = 'many_to_one'), epochs = 100, validation_split = 0.2, batch_size = 100, shuffle = True)
     
     cont = input('do you wanna continue[Y],[N]')
     while cont == 'Y':
-        history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes), epochs = 10, validation_split = 0.2, batch_size = 100, shuffle = True)
+        history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes, window_size, mode = 'many_to_one'), epochs = 10, validation_split = 0.2, batch_size = 100, shuffle = True)
         cont = input('do you wanna continue[Y],[N]')
     
-    score = model.evaluate(test_data[:,:,:-1], one_hot_builder(test_data[:,:,-1], n_classes))
+    score = model.evaluate(test_data[:,:,:-1], one_hot_builder(test_data[:,:,-1], n_classes, window_size, mode = 'many_to_one'))
 
     ''' summarize history for accuracy'''
     plt.figure(4)

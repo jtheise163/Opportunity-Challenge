@@ -10,8 +10,8 @@ import numpy as np
 
 
 '''Hyperparameters sliding Window'''
-window_size = 30
-stride      = 15 # overlap of 50 %
+window_size = 24
+stride      = 12 # overlap of 50 %
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\stride', stride) 
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\window_size', window_size) 
 
@@ -109,6 +109,16 @@ def democratic_Vote(labels):
     vote = int(vote)
     return vote
 
+def null_class_deleter(timewindows):
+    counter = 0
+    to_delete = []
+    for window in timewindows:
+        if democratic_Vote(window[:, -1]) == -1:
+            to_delete.append(counter)
+        counter += 1
+    timewindows = np.delete(timewindows, to_delete, axis = 0)
+    return timewindows
+
 #def naive_balancer(windowed_data_list):
 #    vote = []
 #    for window in windowed_data_list:
@@ -130,6 +140,8 @@ def preprocessing_pipeline(data, window_size, stride, validation_split = 'simple
     dataobj.split_at_timejumps()
     windowed_data_list = Dataprocessor.list_to_timewindow(dataobj.datalist, window_size = window_size, stride = stride, shuffle = True)
     train_data, test_data = train_test_split(windowed_data_list, 0.2)
+    train_data = null_class_deleter(train_data)
+    test_data = null_class_deleter(test_data)
     train_data = train_data[:,:,1:]
     test_data = test_data[:,:,1:]
     return train_data, test_data
