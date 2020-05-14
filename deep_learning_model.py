@@ -22,9 +22,10 @@ def z_score(data):
        every feature has a mean of 0 and a standard deviation of 1
        :param:   data:   2-d Numpy array: datapoint x feature
        :returns: z-score:2-d Numpy array: datapoint x feature (mean = 0, std=1) '''
+    e = 1e-10
     mean = np.mean(data, axis = 0) #columnswise mean and standard_deviation
     std = np.std(data, axis = 0)
-    data = (data - mean)/std
+    data = (data - mean)/(std+e)
     data = np.nan_to_num(data)
     return data
 
