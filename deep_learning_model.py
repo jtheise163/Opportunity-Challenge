@@ -123,11 +123,18 @@ def democratic_Vote(labels):
     vote = int(vote)
     return vote
 
+#def generate(parent1, parent2):
+#    n_timesteps, n_features = np.shape(parent1)
+#    random_array = np.random.rand(n_timesteps, n_features)
+#    inv_random_array = np.ones((n_timesteps, n_features)) - random_array
+#    child = np.multiply(random_array, parent1) + np.multiply(inv_random_array, parent2)
+#    return child
+
 def generate(parent1, parent2):
     n_timesteps, n_features = np.shape(parent1)
-    random_array = np.random.rand(n_timesteps, n_features)
-    inv_random_array = np.ones((n_timesteps, n_features)) - random_array
-    child = np.multiply(random_array, parent1) + np.multiply(inv_random_array, parent2)
+    random = np.random.rand()
+    inv_random = 1 - random
+    child = random * parent1 + inv_random * parent2
     return child
 
    
@@ -146,7 +153,43 @@ def naive_balancer(windowed_data_list):
     return windowed_data_list
 
 
-
+def AVG_SMOTE(train_data):
+    label_list = [democratic_Vote(train_data[i,:,-1]) for i in range(np.shape(train_data)[0])]
+    label, counts = np.unique(label_list, return_counts = True)
+    n_samples = max(counts)-counts
+    samples_per_sample = np.int16(np.round(n_samples/counts))
+    
+    point_in_feature_space = []
+    for window in train_data[:,:,:-1]:
+        point_in_feature_space.append(np.mean(window, axis = 0))
+    
+    neighb = NearestNeighbors(n_neighbors=2).fit(point_in_feature_space)
+    distances, indices = neighb.kneighbors(point_in_feature_space)
+    
+    counter = 0
+    synthetic_data = []
+    syn_label = []
+    for n_samples in samples_per_sample:
+        if n_samples > 0:
+            window_nr = 0
+            for window in train_data:
+                if democratic_Vote(window[:,-1]) == label[counter]:
+                    for _ in range(n_samples):
+                        child = generate(window[:,:-1], train_data[indices[window_nr,1],:,:-1])
+                        syn_label.append(window[:,-1])
+                        synthetic_data.append(child)
+                window_nr += 1
+    
+    
+        counter += 1
+        print(counter)
+    synthetic_data = np.asarray(synthetic_data)
+    syn_label = np.asarray(syn_label)
+    print(np.shape(syn_label))
+    print(np.shape(synthetic_data))
+    synthetic_data = np.concatenate((synthetic_data, np.reshape(syn_label,(-1,np.shape(train_data)[1],1))), axis = 2)
+    synthetic_data = np.concatenate((synthetic_data, train_data), axis = 0)
+    return synthetic_data
 
 #
 #def ADASYN(data):
@@ -224,23 +267,25 @@ if train_test_split == 's_split':
         train_data, test_data= z_score_pipeline(train_data, test_data)
     if do_balancing:
       train_data = naive_balancer(train_data)
+      #train_data = AVG_SMOTE(train_data)
      
 
     
     '''Deep Learning Model'''
     model =   keras.models.Sequential()
-    model.add(Conv1D(64, kernel_size = 5, input_shape = (np.shape(train_data)[1], np.shape(train_data)[2] - 1), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(128, kernel_size = 5, input_shape = (np.shape(train_data)[1], np.shape(train_data)[2] - 1), activation = 'relu', padding = 'valid'))
     #model.add(MaxPooling1D(pool_size=2, strides=2, padding = 'valid', data_format = 'channels_last'))
-    model.add(Conv1D(64, kernel_size = 5, activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(128, kernel_size = 5, activation = 'relu', padding = 'valid'))
     #model.add(MaxPooling1D(pool_size=2, strides=3, padding = 'valid', data_format = 'channels_last'))
-    model.add(Conv1D(64, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
-    model.add(Conv1D(64, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
-    model.add(Conv1D(64, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
-    model.add(Conv1D(64, kernel_size = 4, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(128, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(128, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(128, kernel_size = 5, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
+    model.add(Conv1D(128, kernel_size = 4, input_shape = (None, np.shape(train_data)[2]), activation = 'relu', padding = 'valid'))
     model.add(Flatten())
     #model.add(LSTM(20, return_sequences=True))
     #model.add(LSTM(20, return_sequences=True))
 #    model.add(LSTM(128, return_sequences=False))
+    model.add(Dense(128, activation = 'relu'))
     model.add(Dense(n_classes, activation='softmax'))
     
 #    '''training the model'''
@@ -257,7 +302,7 @@ if train_test_split == 's_split':
     
     '''training the model'''
     model.compile(loss='categorical_crossentropy', optimizer='adam',metrics=['accuracy'])
-    history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes, window_size, mode = 'many_to_one'), epochs = 100, validation_split = 0.2, batch_size = 100, shuffle = True)
+    history = model.fit(train_data[:,:,:-1], one_hot_builder(train_data[:,:,-1], n_classes, window_size, mode = 'many_to_one'), epochs = 30, validation_split = 0.3, batch_size = 200, shuffle = True)
     
     cont = input('do you wanna continue[Y],[N]')
     while cont == 'Y':

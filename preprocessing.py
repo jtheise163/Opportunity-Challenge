@@ -10,8 +10,8 @@ import numpy as np
 
 
 '''Hyperparameters sliding Window'''
-window_size = 24
-stride      = 12 # overlap of 50 %
+window_size = 60
+stride      = 30 # overlap of 50 %
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\stride', stride) 
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\window_size', window_size) 
 
@@ -59,9 +59,8 @@ class Dataprocessor:
            :param: window size: kernel size of the sliding window
            :param: stride:      step size of the sliding window
            :boolean: shuffle:   shuffle the windows randomly for later machine learning algorithms'''
-        n_windows = int((len(dataframe)-window_size +1 )/stride)
+        n_windows = int((len(dataframe)-window_size)/stride)+1
         windowed_data = np.zeros((n_windows, window_size, np.shape(dataframe)[1]))
-        dataframe = dataframe.iloc[:int(len(dataframe)/window_size)*window_size + int(window_size/2),:] # cutting the end of the dataframe to achieve integer window number
         
         for i in range(n_windows):
              windowed_data[i,:,:] = dataframe.iloc[i*stride:i*stride+window_size,:]
