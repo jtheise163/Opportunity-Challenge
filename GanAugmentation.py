@@ -184,21 +184,22 @@ def democratic_Vote(labels):
 
 def build_generator(inp_shape, output_shape):
     model =  keras.models.Sequential()
-    model.add(LSTM(128, input_shape = inp_shape, return_sequences=True))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(LSTM(128, return_sequences=True))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(Dense(output_shape, activation='linear'))
+    model.add(LSTM(20, input_shape = inp_shape, return_sequences=True))
+    #model.add(BatchNormalization(momentum=0.8))
+    #model.add(LSTM(256, return_sequences=True))
+    #model.add(BatchNormalization(momentum=0.8))
+    model.add(Dense(output_shape))
     return model
 
 def build_discriminator(inp_shape):
     model =  keras.models.Sequential()
-    model.add(LSTM(128, input_shape = inp_shape, return_sequences=True))
-    model.add(BatchNormalization(momentum=0.8))
-    model.add(LSTM(128, return_sequences=False))
-    model.add(BatchNormalization(momentum=0.8))
+    model.add(LSTM(256, input_shape = inp_shape, return_sequences=True))
+    #model.add(BatchNormalization(momentum=0.8))
+    model.add(LSTM(256, return_sequences=False))
+    #model.add(BatchNormalization(momentum=0.8))
     model.add(Dense(1, activation = 'sigmoid'))
     return model
+
 
 
 def create_batch(data, batch_size):
@@ -219,7 +220,9 @@ K.clear_session()
 
 
 train_data_with_label = z_score_pipeline(np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy'))
+#rain_data_with_label = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')
 train_data = train_data_with_label[:,:,:-1]
+train_data = train_data/(np.max(train_data))
 train_label_list = train_data_with_label[:,:,-1]
 del train_data_with_label
 
@@ -236,9 +239,18 @@ RANDOM_SIZE = 100
 N_SENSORS = np.shape(train_data)[2]
 WINDOW_LENGTH = np.shape(train_data)[1]
 n_samples = np.shape(train_data)[0]
+Batch_Size = 200
 
 train_data = train_data[ np.where(np.asarray(vote)==3),:,:].reshape(-1,WINDOW_LENGTH, N_SENSORS)
 
+train_data = []
+for i in range (200):
+    window = np.linspace(1,9,32)
+    window = np.sin(window)/2 +0.5
+    window = np.ones((113,32))*window
+    train_data.append(window)
+train_data = np.asarray(train_data)
+train_data = train_data.reshape((-1,32,113))
 
 input_shape_generator = (WINDOW_LENGTH, RANDOM_SIZE)
 input_shape_discriminator = (WINDOW_LENGTH, N_SENSORS)
@@ -246,7 +258,7 @@ output_shape = N_SENSORS
 
 #train_data = create_batch(train_data, 100)
 n_samples = np.shape(train_data)[0]
-random = np.random.rand(n_samples, WINDOW_LENGTH, RANDOM_SIZE)
+random = np.random.rand(Batch_Size, WINDOW_LENGTH, RANDOM_SIZE)
 
 
 generator = build_generator(input_shape_generator, output_shape)
@@ -256,30 +268,36 @@ discriminator.compile(loss='binary_crossentropy',optimizer='adam')
 z = keras.layers.Input(shape=(input_shape_generator))
 gan = build_gan(generator, discriminator, z)
 
+batch_list = create_batch(train_data, Batch_Size)
+
 seeded_random = np.random.rand(1, WINDOW_LENGTH, RANDOM_SIZE)
 disc_loss_history = []
 gen_loss_history = []
 for epoch in range(EPOCHS):
     print('Epoch:',epoch)
-    random = np.random.rand(n_samples, WINDOW_LENGTH, RANDOM_SIZE)
-    generated_series = generator.predict(random)
-    data = np.vstack((generated_series, train_data))
-    label = np.int32([i<n_samples for i in range(n_samples*2)])
-    data, label = shuffle(data, label, random_state=0)
-    print('discriminator training...')
-    disc_loss = discriminator.train_on_batch(data, label)
-    print(disc_loss)
-    disc_loss_history.append(disc_loss)
-    discriminator.trainable = False
-    #gan = build_gan(generator, discriminator, z)
-    print('generator training...')
-    gen_loss = gan.train_on_batch(random, np.zeros(n_samples))
-    print(gen_loss)
-    gen_loss_history.append(gen_loss)
-    discriminator.trainable = True
-#    if epoch % 10 == 0:
-#        example = generator.predict(seeded_random)
-        #plt.plot(example[0,:,100])
+    for batch in batch_list:
+        random = np.random.rand(Batch_Size, WINDOW_LENGTH, RANDOM_SIZE)
+        generated_series = generator.predict(random)
+        data = np.vstack((generated_series, batch))
+        label = np.int32([i<Batch_Size for i in range(Batch_Size*2)])
+        #label = np.zeros[Batch_Size, WINDOW_LENGTH]
+        
+        discriminator.trainable = False
+        #gan = build_gan(generator, discriminator, z)
+        print('generator training...')
+        gen_loss = gan.train_on_batch(random, np.zeros(Batch_Size))
+        #gen_loss = gan.train_on_batch(random, np.ones(Batch_Size))
+        print(gen_loss)
+        gen_loss_history.append(gen_loss)
+        discriminator.trainable = True
+        data, label = shuffle(data, label, random_state=0)
+        print('discriminator training...')
+        disc_loss = discriminator.train_on_batch(data, label)
+        print(disc_loss)
+        disc_loss_history.append(disc_loss)
+#        if epoch % 10 == 0:
+#            example = generator.predict(seeded_random)
+#            plt.plot(example[0,:,100])
     
     
     
@@ -287,7 +305,9 @@ plt.figure(2)
 plt.plot(gen_loss_history)
 plt.plot(disc_loss_history)
 
-
+for i in range (10):
+    plt.plot(train_data[2+i,:,20], color='blue')
+    plt.plot(generated_series[2+i,:,20], color='red')
 
 
 

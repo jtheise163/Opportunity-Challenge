@@ -10,7 +10,7 @@ import pandas as pd
 import glob
 import matplotlib.pyplot as plt
 import scipy.signal
-
+from sklearn.preprocessing import MinMaxScaler
 
 
 '''daten einlesen'''
@@ -97,7 +97,13 @@ class Datencleaner:
                        
             self.daten = self.daten.fillna(0)
             
-            
+     
+    def scaler(self):
+        scaler = MinMaxScaler()
+        scaler.fit(self.daten)
+        self.daten = pd.DataFrame(scaler.transform(self.daten))
+        self.daten.iloc[:,-1] = self.label
+              
            
     
     def nan_vals_check(self):
@@ -131,6 +137,7 @@ dataobj = Datencleaner(roh_daten, column_names)
 feature_column = dataobj.select_columns_opp()
 dataobj.handle_missing_values(method = 'linear_interpolation', threshhold_missingness=0.5)
 check = dataobj.nan_vals_check()
+dataobj.scaler()
 dataobj.datafilter(mode='median', n_med = filtersize)
 data = dataobj.daten
 #data = data.iloc[:,1:]

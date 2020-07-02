@@ -9,9 +9,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+
 '''Hyperparameters sliding Window'''
-window_size = 60
-stride      = 30 # overlap of 50 %
+window_size = 32
+stride      = 16 # overlap of 50 %
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\stride', stride) 
 np.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Hyperparameters\\window_size', window_size) 
 
@@ -81,6 +82,8 @@ class Dataprocessor:
         if shuffle:
             np.random.shuffle(windowed_data_list)
         return windowed_data_list
+    
+
     
 
 def train_test_split(data, percentage):
