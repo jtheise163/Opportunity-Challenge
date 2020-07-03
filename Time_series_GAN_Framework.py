@@ -418,13 +418,21 @@ for epoch in range (n_epochs*10):
         optimizer1.apply_gradients(zip(g_grad, generator.trainable_weights)) 
         s_grad = tape.gradient(G_loss, supervisor.trainable_weights) 
         optimizer1.apply_gradients(zip(s_grad, supervisor.trainable_weights))               
-                                
+        history_generator.append(G_loss)
+        history_discriminator.append(D_loss)
                                 
         
            
             
     if epoch % 2 ==0:
         print(" loss disc = {}\nloss gen = {}\nloss embedding = {}".format(D_loss, G_loss, E_loss ))
+    
+    if epoch % 10 == 0:
+        embedding.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\embedding_weights')
+        reconst.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\recovery_weights')
+        generator.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\generator_weights')
+        supervisor.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\supervisor_weights')
+        disc.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\discriminator_weights')
 
 plt.figure(100)
 plt.plot(history_generator)
@@ -434,11 +442,11 @@ print('finished joint training')
 
 '''creating new artificial data'''
 def create_art_data(generator, supervisor, reconstructor, n_samples, window_length, size_random):
-    noise = random_generator(batch_size, window_length, 0, size_random, 50)
+    noise = random_generator(n_samples, window_length, 0, size_random, 50)
     #print(noise)
-    E_hat = generator(noise)
-    H_hat = supervisor(E_hat)
-    data = reconstructor(H_hat)
+    E_hat = generator.predict(noise)
+    H_hat = supervisor.predict(E_hat)
+    data = reconstructor.predict(H_hat)
     return data
 
 art_data = create_art_data(generator, supervisor, reconst, 100, 32, size_random)
@@ -448,4 +456,28 @@ for sample in range(3):
         plt.plot(art_data[sample,:,k], color='red')
         plt.plot(Train_data[sample,:, k], color = 'blue')
         plt.legend(['generated', 'Toy-time series'])
+        
+
+mean_art_data = np.mean(art_data, axis = 1)
+mean_train_data = np.mean(Train_data, axis = 1)
+std_art_data = np.std(art_data, axis = 1)
+std_train_data = np.std(Train_data, axis = 1)
+
+for i in range(n_features):
+    plt.figure(1)
+    plt.subplot(4,5,i+1)
+    plt.hist(mean_art_data[:, i], density=True)
+    plt.hist(mean_train_data[:,i], density=True)
+    plt.legend(['syn', 'real'])
+    plt.xlabel('mean of feature')
+    plt.ylabel('prob')
+    plt.figure(2)
+    plt.subplot(4,5,i+1)
+    plt.hist(std_art_data[:, i], density=True)
+    plt.hist(std_train_data[:,i], density=True)
+    plt.legend(['syn', 'real'])
+    plt.xlabel('std of feature')
+    plt.ylabel('prob')
+
+
 
