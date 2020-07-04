@@ -329,7 +329,6 @@ for epoch in range(int(n_epochs * 12)):
             H_hat = supervisor(E_hat)
             H_hat_supervise = supervisor(H)
             G_loss_S = mse(H[:, 1:, :], H_hat_supervise[:, :-1, :])
-            print()
         s_grad = tape.gradient(G_loss_S, supervisor.trainable_variables)
         optimizer1.apply_gradients(zip(s_grad, supervisor.trainable_variables))
         if epoch%10==0:
@@ -428,11 +427,13 @@ for epoch in range (n_epochs*10):
         print(" loss disc = {}\nloss gen = {}\nloss embedding = {}".format(D_loss, G_loss, E_loss ))
     
     if epoch % 10 == 0:
+        print('saving model weights')
         embedding.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\embedding_weights')
         reconst.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\recovery_weights')
         generator.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\generator_weights')
         supervisor.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\supervisor_weights')
         disc.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\discriminator_weights')
+        print('finished saving model weights')
 
 plt.figure(100)
 plt.plot(history_generator)
