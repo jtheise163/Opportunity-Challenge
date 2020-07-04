@@ -151,11 +151,11 @@ def build_supervisor(window_length, n_embedding):
 
 def build_discriminator(window_length, n_embedding):
     disc = Sequential()
-    disc.add(Bidirectional(LSTM(500, input_shape = (window_length, n_embedding), return_sequences = True, kernel_regularizer = regularizers.l2(0.01))))
+    disc.add(Bidirectional(LSTM(500, return_sequences = True, kernel_regularizer = regularizers.l2(0.01)), input_shape = (window_length, n_embedding)))
     disc.add(Bidirectional(LSTM(500, return_sequences = True, kernel_regularizer = regularizers.l2(0.01))))
     disc.add(Bidirectional(LSTM(500, return_sequences = False, kernel_regularizer = regularizers.l2(0.01))))
     disc.add(Dense(1, activation = 'sigmoid', kernel_regularizer = regularizers.l2(0.01)))
-    #disc.summary()
+    disc.summary()
     return disc
 
 def bce(y_label, y):
@@ -263,11 +263,11 @@ optimizer2 = tf.keras.optimizers.Adam(lr2)
 
 '''real data 4'''
 filename = 'C:\\Users\\hartmann\\Desktop\\Gangdaten_timegan.csv'
-daten = pd.read_csv(filename).iloc[:,2:]
-daten = handle_missing_values(daten, method = 'linear_interpolation')
-daten = myscaler(daten)
-daten = sliding(daten, 32, 16)[0:20,:,:20]
-Train_data = daten
+Train_data = pd.read_csv(filename).iloc[:,2:]
+Train_data = handle_missing_values(Train_data, method = 'linear_interpolation')
+Train_data = myscaler(Train_data)
+Train_data = sliding(Train_data, 32, 16)[0:20,:,:20]
+
 
 
 
@@ -478,6 +478,11 @@ for i in range(n_features):
     plt.legend(['syn', 'real'])
     plt.xlabel('std of feature')
     plt.ylabel('prob')
+    
+path = 'C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights'
 
-
-
+embedding = tf.keras.models.load_model(path + '\\embedding_weights')
+recovery = tf.keras.models.load_model(path + '\\recovery_weights')
+generator = tf.keras.models.load_model(path + '\\generator_weights')
+supervisor = tf.keras.models.load_model(path + '\\supervisor_weights')
+disc = tf.keras.models.load_model(path + '\\embedding_weights')
