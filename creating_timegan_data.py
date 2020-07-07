@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import glob
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn import decomposition
+from sklearn import datasets
+from sklearn.preprocessing import StandardScaler
 
 
 
@@ -113,15 +116,16 @@ def myscaler(data):
     norm_data = data / (max_val + 1e-7)
       
     return norm_data
+
     
 
 '''real data 4'''
 filename = 'C:\\Users\\hartmann\\Desktop\\Gangdaten_timegan.csv'
-daten = pd.read_csv(filename).iloc[:,2:]
-daten = handle_missing_values(daten, method = 'linear_interpolation')
-daten = myscaler(daten)
-daten = sliding(daten, 32, 16)[0:20,:,:20]
-Train_data = daten
+Train_data = pd.read_csv(filename).iloc[:,2:]
+Train_data = handle_missing_values(Train_data, method = 'linear_interpolation')
+Train_data = myscaler(Train_data)
+Train_data = sliding(Train_data, 32, 16)[0:20,:,:20]
+
 
 
 class Art_data:
@@ -190,10 +194,28 @@ for i in range(n_features):
     plt.subplot(4,5,i+1)
     plt.hist(std_art_data[:, i], density=True)
     plt.hist(std_train_data[:,i], density=True)
-    plt.legend(['syn', 'real'])
+    plt.legend(['syn', 'real'], fontsize =2)
     plt.xlabel('std of feature')
     plt.ylabel('prob')
 
+scaler_real = StandardScaler()
+scaler_real.fit(Train_data.reshape(-1, n_features))
+Train_data = scaler_real.transform(Train_data.reshape(-1, n_features))
 
+pca = decomposition.PCA(n_components = 2)
+pca.fit(Train_data.reshape(-1, n_features))
+Train_data_pca = pca.transform(Train_data.reshape(-1, n_features))
 
+#scaler_syn = StandardScaler()
+#scaler_syn.fit(syn_data.reshape(-1, n_features))
+syn_data = scaler_real.transform(syn_data.reshape(-1, n_features))
+
+#pca_syn = decomposition.PCA(n_components = 2)
+#pca_syn.fit(syn_data.reshape(-1, n_features))
+syn_data = pca.transform(syn_data.reshape(-1, n_features))
+
+plt.figure(3)
+plt.scatter(syn_data[:,0], syn_data[:,1])
+plt.scatter(Train_data_pca[:,0], Train_data_pca[:,1])
+plt.legend(['syn_data', 'real_data'])
 
