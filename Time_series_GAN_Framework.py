@@ -22,11 +22,18 @@ import matplotlib.pyplot as plt
 import glob
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn import decomposition
 
-def random_generator(batch_size, window_length, mean, n_random, N):
+def random_generator(n_samples, window_length, mean, n_random, N):
+    '''wiener process
+      :param: n_samples: integer, number of samples
+      :param: window_length: integer, number of timesteps per window
+      :param: mean: float, starting point of the process
+      :param: n_random: integer, size of random vector
+      :param: N: integer, number of iterations for the next time step'''
     window_list = []
     dt = 1/ N
-    for _ in range(batch_size):
+    for _ in range(n_samples):
         window = []
         vec = np.ones((n_random)) * mean
         for _ in range(window_length):
@@ -39,15 +46,10 @@ def random_generator(batch_size, window_length, mean, n_random, N):
         
     return window_list
 
-def handle_missing_values(daten, method = 'linear_interpolation', threshhold_missingness = 0.5 ):
-        '''method to deal with nan values'''
-        # features with missingness of data above 50% are now deleted
-        n_rows, n_cols = np.shape(daten)
-#        for col in range(n_cols):
-#            n_nans = np.sum(daten.iloc[:,col].isna())
-#            percentage_nan = n_nans/n_rows
-#            if  percentage_nan > threshhold_missingness:
-#                daten.drop(columns = daten.columns[col], inplace = True)
+def handle_missing_values(daten, method = 'linear_interpolation'):
+        '''method to deal with nan values
+          :param: daten: pandas DataFrame, data matrix
+          :param: method: string, method of choice for interpolation'''
         '''different methods to deal with missing data'''       
         if method == 'linear_interpolation':
             # interpolates the missing data in the sensorchannels linear over time with the subsequent values
@@ -73,12 +75,11 @@ def handle_missing_values(daten, method = 'linear_interpolation', threshhold_mis
             daten = daten.fillna(0)
         return daten
             
-
 def sliding(dataframe, window_size, stride, shuffle = False):
         '''puts a sliding window over a dataframe with
-           :param: window size: kernel size of the sliding window
-           :param: stride:      step size of the sliding window
-           :boolean: shuffle:   shuffle the windows randomly for later machine learning algorithms'''
+          :param: window size: kernel size of the sliding window
+          :param: stride:      step size of the sliding window
+          :param: shuffle: boolean, shuffle the windows randomly for later machine learning algorithms'''
         n_windows = int((len(dataframe)-window_size)/stride)+1
         windowed_data = np.zeros((n_windows, window_size, np.shape(dataframe)[1]))
         
@@ -91,29 +92,43 @@ def sliding(dataframe, window_size, stride, shuffle = False):
         return windowed_data
 
 def democratic_Vote(labels):
+    '''democratic vote for an overall label of an time window
+      :param: labels: numpy -1d - array, containig the labels of time window'''
     (label, label_count) = np.unique(np.int32(labels), return_counts = True)
     index = np.where(np.max(label_count))[0]
     vote = label[index] 
     vote = int(vote)
     return vote
 
-def build_embedding(window_length, n_features, n_embedding):
+def build_embedding(window_length, n_features, n_embedding, n_hidden):
+    '''building an embedding neural network to encode time series
+      :param: window_length: integer, number of timesteps per window
+      :param: n_features: integer, number of input dimension
+      :param: n_embedding, integer, number of encoded output
+      :param: n_hidden, integer, number units in hidden layer'''
     embedding = Sequential()
-    embedding.add(LSTM(500, input_shape = (window_length, n_features), return_sequences = True))
-    embedding.add(LSTM(500, return_sequences = True))
-    embedding.add(LSTM(500, return_sequences = True))
+    embedding.add(LSTM(n_hidden, input_shape = (window_length, n_features), return_sequences = True))
+    embedding.add(LSTM(n_hidden, return_sequences = True))
+    embedding.add(LSTM(n_hidden, return_sequences = True))
     embedding.add(TimeDistributed(Dense(n_embedding, activation='sigmoid')))
     embedding.summary()
     return embedding
 
-def build_reconstruction(window_length, n_embedding, n_features):
-    reconst = Sequential()
-    reconst.add(LSTM(500, input_shape = (window_length, n_embedding), return_sequences = True))
-    reconst.add(LSTM(500, return_sequences = True))
-    reconst.add(LSTM(500, return_sequences = True))
-    reconst.add(TimeDistributed(Dense(n_features, activation = 'sigmoid')))
-    reconst.summary()
-    return reconst
+'''neural networks of timegan'''
+
+def build_reconstruction(window_length, n_embedding, n_features, n_hidden):
+    '''building an reconstruction neural network to decode time series
+      :param: window_length: integer, number of timesteps per window
+      :param: n_embedding, integer, number of encoded output
+      :param: n_features: integer, number of input dimension
+      :param: n_hidden, integer, number units in hidden layer'''
+    recovery = Sequential()
+    recovery.add(LSTM(n_hidden, input_shape = (window_length, n_embedding), return_sequences = True))
+    recovery.add(LSTM(n_hidden, return_sequences = True))
+    recovery.add(LSTM(n_hidden, return_sequences = True))
+    recovery.add(TimeDistributed(Dense(n_features, activation = 'sigmoid')))
+    recovery.summary()
+    return recovery
     
 #def build_reconstruction(window_length, n_embedding, n_features):
 #    reconst = Sequential()
@@ -124,36 +139,36 @@ def build_reconstruction(window_length, n_embedding, n_features):
 #    reconst.summary()
 #    return reconst
 
-def build_generator(window_length, size_random, n_embedding):
+def build_generator(window_length, size_random, n_embedding, n_hidden):
+    '''building an generating neural network to create artificial training data
+      :param: window_length: integer, number of timesteps per window
+      :param: size_random, integer, dimension of random input vector
+      :param: n_embedding: integer, number of output units
+      :param: n_hidden, integer, number units in hidden layer'''
     generator = Sequential()
-    #generator.add(Dense(300, input_shape = (size_random,)))
-    #generator.add(RepeatVector(window_length))
-    generator.add(LSTM(500, input_shape = (window_length, size_random), return_sequences = True, return_state = False))
-    generator.add(LSTM(500, return_sequences = True, return_state = False))
-    generator.add(LSTM(500, return_sequences = True, return_state = False))
-#    generator.add(RepeatVector(window_length))
-#    generator.add(LSTM(100, return_sequences = True, return_state = False))
-#    generator.add(LSTM(100, return_sequences = True, return_state = False))
-    #generator.add(TimeDistributed(Dense(20, activation='relu')))
+    generator.add(LSTM(n_hidden, input_shape = (window_length, size_random), return_sequences = True, return_state = False))
+    generator.add(LSTM(n_hidden, return_sequences = True, return_state = False))
+    generator.add(LSTM(n_hidden, return_sequences = True, return_state = False))
     generator.add(TimeDistributed(Dense(n_embedding, activation = 'sigmoid')))
     generator.summary()
     return generator
 
-def build_supervisor(window_length, n_embedding):
+def build_supervisor(window_length, n_embedding, n_hidden):
+    ''''''
     supervisor = Sequential()
-    supervisor.add(LSTM(500, input_shape = (window_length, n_embedding), return_sequences = True, return_state = False))
-    supervisor.add(LSTM(500, return_sequences = True, return_state = False))
-    supervisor.add(LSTM(500, return_sequences = True, return_state = False))
+    supervisor.add(LSTM(n_hidden, input_shape = (window_length, n_embedding), return_sequences = True, return_state = False))
+    supervisor.add(LSTM(n_hidden, return_sequences = True, return_state = False))
+    supervisor.add(LSTM(n_hidden, return_sequences = True, return_state = False))
     supervisor.add(TimeDistributed(Dense(n_embedding, activation = 'sigmoid')))
     supervisor.summary()
     return supervisor
 
 
-def build_discriminator(window_length, n_embedding):
+def build_discriminator(window_length, n_embedding, n_hidden):
     disc = Sequential()
-    disc.add(Bidirectional(LSTM(500, return_sequences = True, kernel_regularizer = regularizers.l2(0.01)), input_shape = (window_length, n_embedding)))
-    disc.add(Bidirectional(LSTM(500, return_sequences = True, kernel_regularizer = regularizers.l2(0.01))))
-    disc.add(Bidirectional(LSTM(500, return_sequences = False, kernel_regularizer = regularizers.l2(0.01))))
+    disc.add(Bidirectional(LSTM(n_hidden, return_sequences = True, kernel_regularizer = regularizers.l2(0.01)), input_shape = (window_length, n_embedding)))
+    disc.add(Bidirectional(LSTM(n_hidden, return_sequences = True, kernel_regularizer = regularizers.l2(0.01))))
+    disc.add(Bidirectional(LSTM(n_hidden, return_sequences = False, kernel_regularizer = regularizers.l2(0.01))))
     disc.add(Dense(1, activation = 'sigmoid', kernel_regularizer = regularizers.l2(0.01)))
     disc.summary()
     return disc
@@ -196,27 +211,11 @@ def myscaler(data):
       
     return norm_data
     
-'''Hyperparameters TimeGAN'''
-n_embedding = 10
-batch_size = 20
-n_epochs = 100
-size_random = 20
-#Learning rates
-lr2 = 0.0001
-lr1 = 0.0001
-#balancing loss
-k = 1
-mu = 10
-gamma = 1
+  
 
-'''defining gradient descent optimizer'''
-optimizer1 = tf.keras.optimizers.Adam(lr1)
-optimizer2 = tf.keras.optimizers.Adam(lr2)
-
-'''real Data 1'''
-#train_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')[0,:,:-1]
-#Train_data = train_data.reshape((1,32,113))
-#train_data_labels = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')[0,:,-1]
+#'''real Data 1'''
+#train_data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')[:,:,:-1]
+#train_data_labels = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')[:,:,-1]
 #vote = []
 #for train_label in train_data_labels:
 #    vote.append(democratic_Vote(train_label))
@@ -228,7 +227,7 @@ optimizer2 = tf.keras.optimizers.Adam(lr2)
 #n_features = np.shape(train_data)[2]
 #n_samples = np.shape(train_data)[0]
 #
-#Train_data = train_data[ np.where(np.asarray(vote)==3),:,:].reshape(-1,window_length, n_features)
+#Train_data = train_data[ np.where(np.asarray(vote)==2),:,:].reshape((-1, window_length, n_features))[:40,:,:]
 
 '''real data 2'''
 #n= 1
@@ -256,17 +255,18 @@ optimizer2 = tf.keras.optimizers.Adam(lr2)
 ##Train_data = Train_data.reshape((1,128,-1))
 
 '''real data 3'''
-#filename = 'C:\\Users\\hartmann\\Desktop\\x_sense\\treppen_laufen\\treppe.txt'      
-#daten = pd.read_csv(filename, encoding = "utf_16", sep='\t', decimal = ','  ).iloc[:, 2:20]
-#daten = scaler(daten)
-#Train_data = sliding(daten, 128, 64)[:, :, :]
+filename = 'C:\\Users\\hartmann\\Desktop\\x_sense\\treppen_laufen\\treppe.txt'      
+daten = pd.read_csv(filename, encoding = "utf_16", sep='\t', decimal = ','  ).iloc[:, 2:]
+daten = scaler(daten)
+Train_data = sliding(daten, 128, 64)[:, :, :42]
 
-'''real data 4'''
-filename = 'C:\\Users\\hartmann\\Desktop\\Gangdaten_timegan.csv'
-Train_data = pd.read_csv(filename).iloc[:,2:]
-Train_data = handle_missing_values(Train_data, method = 'linear_interpolation')
-Train_data = myscaler(Train_data)
-Train_data = sliding(Train_data, 32, 16)[0:20,:,:20]
+
+#'''real data 4'''
+#filename = 'C:\\Users\\hartmann\\Desktop\\Gangdaten_timegan.csv'
+#Train_data = pd.read_csv(filename).iloc[:,2:]
+#Train_data = handle_missing_values(Train_data, method = 'linear_interpolation')
+#Train_data = myscaler(Train_data)
+#Train_data = sliding(Train_data, 32, 16)[0:20,:,:20]
 
 
 
@@ -286,41 +286,67 @@ window_length = np.shape(Train_data)[1]
 n_features = np.shape(Train_data)[2]
 n_samples = np.shape(Train_data)[0]
 
+#'''pca'''
+#pca = decomposition.PCA(0.99)
+#pca.fit(Train_data.reshape(-1, n_features))
+#Train_data = pca.transform(Train_data.reshape(-1, n_features))
+#n_features = np.shape(Train_data)[1]
+#Train_data = Train_data.reshape((-1, window_length, n_features))
+
+
+'''Hyperparameters TimeGAN'''
+n_embedding = int(n_features/2)
+batch_size = 64
+n_epochs = 1000
+size_random = 60
+n_hidden = int (n_features * 4)
+#Learning rates
+lr2 = 0.0001
+lr1 = 0.0001
+#balancing loss
+k = 1
+mu = 10
+gamma = 1 
+
+'''defining gradient descent optimizer'''
+optimizer1 = tf.keras.optimizers.Adam(lr1)
+optimizer2 = tf.keras.optimizers.Adam(lr2)
+
 '''Data pipeline for tensorflow'''
 train_data = tf.constant(Train_data, dtype=tf.float32)
 train_data = tf.data.Dataset.from_tensor_slices(train_data)
 train_data = train_data.batch(batch_size, drop_remainder = True)
 
 '''building embedding reconstruction generator and discriminator'''
-embedding = build_embedding(window_length, n_features, n_embedding)
-reconst = build_reconstruction(window_length, n_embedding, n_features)
-generator = build_generator(window_length, size_random, n_embedding)
-disc = build_discriminator(window_length, n_embedding)
-supervisor = build_supervisor(window_length, n_embedding)
+embedding = build_embedding(window_length, n_features, n_embedding, n_hidden)
+recovery = build_reconstruction(window_length, n_embedding, n_features, n_hidden)
+generator = build_generator(window_length, size_random, n_embedding, n_hidden)
+disc = build_discriminator(window_length, n_embedding, n_hidden)
+supervisor = build_supervisor(window_length, n_embedding, n_hidden)
 
 
 '''beginn custom training loop'''
 
 print('pretraining embedding network...')
-for epoch in range(int(n_epochs * 20)):
+for epoch in range(int(n_epochs)):
     for X in train_data:
         with tf.GradientTape(watch_accessed_variables = True, persistent = True) as tape: 
             H = embedding(X)
-            X_tilde = reconst(H)
+            X_tilde = recovery(H)  
                 
             E_loss_T0 = mse(X, X_tilde)
             E_loss0 = 10* tf.sqrt(E_loss_T0)
         e_grad = tape.gradient(E_loss0, embedding.trainable_variables)
-        r_grad = tape.gradient(E_loss0, reconst.trainable_variables)
+        r_grad = tape.gradient(E_loss0, recovery.trainable_variables)
         optimizer1.apply_gradients(zip(e_grad, embedding.trainable_variables))
-        optimizer1.apply_gradients(zip(r_grad, reconst.trainable_variables))
+        optimizer1.apply_gradients(zip(r_grad, recovery.trainable_variables))
         if epoch%10==0:
             print(epoch)
             print(E_loss0)
 print('finished pretraining embedding network')
 
 print('training generator with supervised loss...')
-for epoch in range(int(n_epochs * 12)):
+for epoch in range(int(n_epochs)):
     for X in train_data:
         with tf.GradientTape() as tape:
             H = embedding(X)
@@ -367,20 +393,20 @@ print('finish pretrtain disc')
 history_discriminator = []
 history_generator = []
 print('joint training...')
-for epoch in range (n_epochs*10):
+for epoch in range (n_epochs):
     print('epoch:',epoch)
     for X in train_data:
         for kk in range(2):
             with tf.GradientTape(watch_accessed_variables = True, persistent = True) as tape:
                 H = embedding(X)
-                X_tilde = reconst(H)
+                X_tilde = recovery(H)
                 
                 noise =  random_generator(batch_size, window_length, 0, size_random, 50)
                 E_hat = generator(noise)
                 H_hat = supervisor(E_hat)
                 H_hat_supervise = supervisor(H)
                     
-                X_hat = reconst(H_hat)
+                X_hat = recovery(H_hat)
                 
                 
                 Y_fake = disc(H_hat)
@@ -424,12 +450,12 @@ for epoch in range (n_epochs*10):
            
             
     if epoch % 2 ==0:
-        print(" loss disc = {}\nloss gen = {}\nloss embedding = {}".format(D_loss, G_loss, E_loss ))
+        print("loss disc = {}\nloss gen = {}\nloss embedding = {}".format(D_loss, G_loss, E_loss ))
     
     if epoch % 10 == 0:
         print('saving model weights')
         embedding.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\embedding_weights')
-        reconst.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\recovery_weights')
+        recovery.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\recovery_weights')
         generator.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\generator_weights')
         supervisor.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\supervisor_weights')
         disc.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\discriminator_weights')
@@ -444,19 +470,19 @@ print('finished joint training')
 '''creating new artificial data'''
 def create_art_data(generator, supervisor, reconstructor, n_samples, window_length, size_random):
     noise = random_generator(n_samples, window_length, 0, size_random, 50)
-    #print(noise)
+    print(np.shape(noise))
     E_hat = generator.predict(noise)
     H_hat = supervisor.predict(E_hat)
     data = reconstructor.predict(H_hat)
     return data
 
-art_data = create_art_data(generator, supervisor, reconst, 100, 32, size_random)
-for sample in range(3):
+art_data = create_art_data(generator, supervisor, recovery, 100, window_length, size_random)
+for sample in range(100):
     for k in range(5):
         #plt.figure(sample)
         plt.plot(art_data[sample,:,k], color='red')
         plt.plot(Train_data[sample,:, k], color = 'blue')
-        plt.legend(['generated', 'Toy-time series'])
+        plt.legend(['generated', 'real data'])
         
 
 mean_art_data = np.mean(art_data, axis = 1)

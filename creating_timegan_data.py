@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras import regularizers
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Bidirectional, RepeatVector, TimeDistributed
+from tensorflow.keras.layers import Dense, LSTM, Bidirectional, RepeatVector, TimeDistributed, Conv1D
 import matplotlib.pyplot as plt
 import glob
 import pandas as pd
@@ -117,14 +117,25 @@ def myscaler(data):
       
     return norm_data
 
-    
+'''opportunity data'''
+
+split = 0.8
+
+Data = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')[:,:,:-1]
+Data_labels = np.load('C:\\Users\\hartmann\\Desktop\\Opportunity\\processed_data\\train_data.npy')[:,:,-1]
+
+Train_data = Data[:int(split * len(Data)),:,:]
+Train_data_labels = Data_labels[:int(split * len(Data)),:]
+
+Test_data = Data[int(split * len(Data)):,:,:]
+Test_data_labels = Data_labels[int(split * len(Data)):,:]
 
 '''real data 4'''
-filename = 'C:\\Users\\hartmann\\Desktop\\Gangdaten_timegan.csv'
-Train_data = pd.read_csv(filename).iloc[:,2:]
-Train_data = handle_missing_values(Train_data, method = 'linear_interpolation')
-Train_data = myscaler(Train_data)
-Train_data = sliding(Train_data, 32, 16)[0:20,:,:20]
+#filename = 'C:\\Users\\hartmann\\Desktop\\Gangdaten_timegan.csv'
+#Train_data = pd.read_csv(filename).iloc[:,2:]
+#Train_data = handle_missing_values(Train_data, method = 'linear_interpolation')
+#Train_data = myscaler(Train_data)
+#Train_data = sliding(Train_data, 32, 16)[0:20,:,:20]
 
 
 
@@ -170,9 +181,9 @@ class Art_data:
         data = self.recovery.predict(H_hat)
         return data
 
-n_features = 20
+n_features = 113
 path = 'C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights'
-data_generator = Art_data(32, 20, 1000)
+data_generator = Art_data(128, 60, 1000)
 data_generator.load_models(path)
 data_generator.random_generator(0, 50)
 syn_data = data_generator.create_art_data()
@@ -182,7 +193,7 @@ mean_train_data = np.mean(Train_data, axis = 1)
 std_art_data = np.std(syn_data, axis = 1)
 std_train_data = np.std(Train_data, axis = 1)
 
-for i in range(n_features):
+for i in range(20):
     plt.figure(1)
     plt.subplot(4,5,i+1)
     plt.hist(mean_art_data[:, i], density=True)
@@ -194,28 +205,120 @@ for i in range(n_features):
     plt.subplot(4,5,i+1)
     plt.hist(std_art_data[:, i], density=True)
     plt.hist(std_train_data[:,i], density=True)
-    plt.legend(['syn', 'real'], fontsize =2)
+    plt.legend(['syn', 'real'])
     plt.xlabel('std of feature')
     plt.ylabel('prob')
 
 scaler_real = StandardScaler()
 scaler_real.fit(Train_data.reshape(-1, n_features))
-Train_data = scaler_real.transform(Train_data.reshape(-1, n_features))
+Train_data_scaled = scaler_real.transform(Train_data.reshape(-1, n_features))
+Test_data_scaled = scaler_real.transform(Test_data.reshape(-1, n_features))
 
 pca = decomposition.PCA(n_components = 2)
-pca.fit(Train_data.reshape(-1, n_features))
-Train_data_pca = pca.transform(Train_data.reshape(-1, n_features))
+pca.fit(Train_data_scaled.reshape(-1, n_features))
+Train_data_pca = pca.transform(Train_data_scaled.reshape(-1, n_features))
 
 #scaler_syn = StandardScaler()
 #scaler_syn.fit(syn_data.reshape(-1, n_features))
-syn_data = scaler_real.transform(syn_data.reshape(-1, n_features))
+syn_data_scaled = scaler_real.transform(syn_data.reshape(-1, n_features))
 
 #pca_syn = decomposition.PCA(n_components = 2)
 #pca_syn.fit(syn_data.reshape(-1, n_features))
-syn_data = pca.transform(syn_data.reshape(-1, n_features))
+syn_data_pca = pca.transform(syn_data_scaled.reshape(-1, n_features))
 
 plt.figure(3)
-plt.scatter(syn_data[:,0], syn_data[:,1])
 plt.scatter(Train_data_pca[:,0], Train_data_pca[:,1])
-plt.legend(['syn_data', 'real_data'])
+plt.scatter(syn_data_pca[:,0], syn_data_pca[:,1])
+plt.legend(['real_data', 'syn_data'])
 
+
+#Model = Sequential()
+#Model.add(LSTM(n_hidden, input_shape = (window_length, n_embedding), return_sequences = True, return_state = False))
+#Model.add(LSTM(n_hidden, return_sequences = True, return_state = False))
+#Model.add(LSTM(n_hidden, return_sequences = True, return_state = False))
+#Model.add(TimeDistributed(Dense(n_embedding, activation = 'sigmoid')))
+#Model.summary()
+
+Train_data = Train_data_scaled.reshape((-1, 32, n_features))
+Test_data = Test_data_scaled.reshape((-1, 32, n_features))
+
+
+vote = []
+for train_label in Train_data_labels:
+    vote.append(democratic_Vote(train_label))
+(label_list, label_count) = np.unique(np.int32(vote), return_counts = True)
+add = np.max(label_count) - label_count
+
+weights = []
+N = np.shape(Train_data)[0]
+for i in range(len(label_count)):
+    weights.append(N/label_count[i])
+    
+class_weights = {0: weights[0], 1: weights[1], 2: weights[2], 3: weights[3]}
+classweight_binary  = {0: 1, 1:7}
+
+
+
+'''Train on real test on synthetic'''
+#Hyperparams
+n_feature_maps = 64
+kernelsize = 5
+stride = 1
+n_classes = 1#np.unique(Train_data_labels)[0]
+
+
+
+targets = tf.keras.utils.to_categorical(np.asarray([democratic_Vote(Train_data_labels[i,:]) for i in range(np.shape(Train_data_labels)[0])]))
+targets_binary_index = np.where (np.asarray([democratic_Vote(Train_data_labels[i,:]) for i in range(np.shape(targets)[0])]) == 2)[0]
+targets_binary = np.zeros((len(targets)))
+targets_binary[targets_binary_index] = 1
+
+targets_test = tf.keras.utils.to_categorical(np.asarray([democratic_Vote(Test_data_labels[i,:]) for i in range(np.shape(Test_data_labels)[0])]))
+targets_test_binary_index = np.where (np.asarray([democratic_Vote(Test_data_labels[i,:]) for i in range(np.shape(targets_test)[0])]) == 2)[0]
+targets_test_binary = np.zeros((len(targets_test)))
+targets_test_binary[targets_test_binary_index] = 1
+
+Model = Sequential()
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, input_shape = (np.shape(Train_data)[1], np.shape(Train_data)[2]), padding = 'valid', activation = 'relu'))
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, padding = 'valid', activation = 'relu'))
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, padding = 'valid', activation = 'relu'))
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, padding = 'valid', activation = 'relu'))
+#Model.add(LSTM(128, input_shape=(32,113), return_sequences = True))
+Model.add(LSTM(128, return_sequences = True))
+Model.add(LSTM(128, return_sequences = False))
+Model.add(Dense(n_classes, activation = 'sigmoid'))
+Model.compile(loss='binary_crossentropy', optimizer='adam', metrics = ['binary_accuracy'])
+history = Model.fit(Train_data, targets_binary, epochs = 8, batch_size = 128, shuffle = True, validation_split = 0.2, class_weight = classweight_binary)
+
+Model.save('C:\\Users\\hartmann\\Desktop\\Opportunity\\Timegan_weights\\Model_weights')
+
+
+accuracy_syn = np.mean( Model.predict(syn_data))
+accuracy_test = Model.evaluate(Test_data, targets_test_binary)
+
+real_data = Train_data[targets_binary_index]
+Train_data = np.delete(Train_data, targets_binary_index, 0)
+Train_data_labels = np.zeros((np.shape(Train_data)[0]))
+Train_data = np.vstack((Train_data, syn_data))
+Train_data_labels = np.hstack((Train_data_labels, np.ones(np.shape(syn_data)[0])))
+
+
+state = np.random.get_state()
+np.random.shuffle(Train_data)
+np.random.set_state(state)
+np.random.shuffle(Train_data_labels)
+
+
+Model = Sequential()
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, input_shape = (np.shape(Train_data)[1], np.shape(Train_data)[2]), padding = 'valid', activation = 'relu'))
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, padding = 'valid', activation = 'relu'))
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, padding = 'valid', activation = 'relu'))
+Model.add(Conv1D(n_feature_maps, kernel_size = kernelsize, padding = 'valid', activation = 'relu'))
+#Model.add(LSTM(128, input_shape=(32,113), return_sequences = True))
+Model.add(LSTM(128, return_sequences = True))
+Model.add(LSTM(128, return_sequences = False))
+Model.add(Dense(n_classes, activation = 'sigmoid'))
+Model.compile(loss='binary_crossentropy', optimizer='adam', metrics = ['binary_accuracy'])
+history = Model.fit(Train_data, Train_data_labels, epochs = 8, batch_size = 128, shuffle = True, validation_split = 0.2, class_weight = classweight_binary)
+
+accuracy_real = np.mean( Model.predict(real_data))
